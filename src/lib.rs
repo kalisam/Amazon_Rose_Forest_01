@@ -4,7 +4,7 @@ pub mod network;
 pub mod sharding;
 pub mod utils;
 pub mod server;
-pub mod holochain;
+pub mod darwin;
 
 // Export common types for easier access
 pub use crate::core::vector::Vector;
@@ -14,7 +14,7 @@ pub use crate::network::circuit_breaker::{CircuitBreaker, CircuitState};
 pub use crate::nerv::runtime::Runtime;
 pub use crate::sharding::hilbert::HilbertCurve;
 pub use crate::sharding::vector_index::{VectorIndex, DistanceMetric, SearchResult};
-pub use crate::holochain::arbitration::{ArbitrationState, arbitrate_conflict};
+pub use crate::darwin::self_improvement::SelfImprovementEngine;
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

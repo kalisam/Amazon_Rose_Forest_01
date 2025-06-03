@@ -3,6 +3,11 @@ use amazon_rose_forest::nerv::runtime::Runtime;
 use amazon_rose_forest::sharding::manager::ShardManager;
 use amazon_rose_forest::sharding::vector_index::DistanceMetric;
 use amazon_rose_forest::core::vector::Vector;
+use amazon_rose_forest::darwin::self_improvement::SelfImprovementEngine;
+use amazon_rose_forest::darwin::validation::{ValidationPipeline, UnitTestStage, PerformanceBenchmarkStage, SecurityValidationStage};
+use amazon_rose_forest::darwin::exploration::ExplorationStrategy;
+use amazon_rose_forest::darwin::agent::CodingAgent;
+
 use std::sync::Arc;
 use std::collections::HashMap;
 use tracing::{info, error, debug, warn};
@@ -18,22 +23,6 @@ async fn main() -> anyhow::Result<()> {
     // Initialize metrics
     let metrics = Arc::new(MetricsCollector::new().with_report_interval(std::time::Duration::from_secs(30)));
     
-    // Check if Holochain integration is enabled
-    let holochain_enabled = std::env::var("ENABLE_HOLOCHAIN").unwrap_or_default() == "1";
-    
-    if holochain_enabled {
-        info!("Holochain integration is enabled");
-        
-        // This would initialize Holochain in a real implementation
-        // For now, this is just informational
-        info!("Note: Holochain conductor would be initialized here in a real environment");
-        
-        // In a real implementation, we would start the Holochain conductor:
-        // start_holochain_conductor().await?;
-    } else {
-        info!("Using native storage (Holochain integration disabled)");
-    }
-    
     // Start the runtime
     let mut runtime = Runtime::new(metrics.clone());
     runtime.start().await?;
@@ -46,6 +35,37 @@ async fn main() -> anyhow::Result<()> {
             return Err(anyhow::anyhow!("Shard manager not initialized"));
         }
     };
+    
+    // Initialize Darwin Gödel Machine components
+    info!("Initializing Darwin Gödel Machine components");
+    
+    // Create validation pipeline
+    let mut validation_pipeline = ValidationPipeline::new(metrics.clone());
+    validation_pipeline.add_stage(UnitTestStage);
+    validation_pipeline.add_stage(PerformanceBenchmarkStage);
+    validation_pipeline.add_stage(SecurityValidationStage);
+    
+    // Set validation thresholds
+    validation_pipeline.set_threshold("unit_tests.pass_rate", 0.9);
+    validation_pipeline.set_threshold("performance.vector_search_latency_ms", 10.0);
+    validation_pipeline.set_threshold("security.vulnerability_score", 0.2);
+    
+    let validation_pipeline = Arc::new(validation_pipeline);
+    
+    // Create exploration strategy
+    let exploration_strategy = Arc::new(ExplorationStrategy::new(metrics.clone()));
+    
+    // Create self-improvement engine
+    let self_improvement_engine = Arc::new(SelfImprovementEngine::new(
+        metrics.clone(),
+        validation_pipeline.clone(),
+        exploration_strategy.clone(),
+    ));
+    
+    // Create coding agent
+    let coding_agent = Arc::new(CodingAgent::new(metrics.clone()));
+    
+    info!("Darwin Gödel Machine components initialized");
     
     // Create a demo shard
     let shard_id = shard_manager.create_shard("demo_shard").await?;
@@ -107,24 +127,32 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     
-    // Print Holochain integration info
-    if holochain_enabled {
-        info!("Amazon Rose Forest with Holochain integration started successfully");
-        info!("Community arbitration system is active");
-    } else {
-        info!("Amazon Rose Forest started successfully");
-    }
+    // Start self-improvement loop
+    let self_improvement_clone = self_improvement_engine.clone();
+    tokio::spawn(async move {
+        loop {
+            // Generate new improvement proposals
+            match self_improvement_clone.generate_modifications().await {
+                Ok(ids) => {
+                    if !ids.is_empty() {
+                        info!("Generated {} new improvement proposals", ids.len());
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to generate improvements: {}", e);
+                }
+            }
+            
+            // Wait before next iteration
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+        }
+    });
+    
+    info!("Amazon Rose Forest started successfully with Darwin Gödel Machine integration");
     
     // Wait for ctrl+c signal
     tokio::signal::ctrl_c().await?;
     info!("Shutting down...");
-    
-    // Close Holochain conductor if it was started
-    if holochain_enabled {
-        info!("Stopping Holochain conductor...");
-        // In a real implementation:
-        // stop_holochain_conductor().await?;
-    }
     
     Ok(())
 }
