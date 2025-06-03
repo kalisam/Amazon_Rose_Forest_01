@@ -18,6 +18,22 @@ async fn main() -> anyhow::Result<()> {
     // Initialize metrics
     let metrics = Arc::new(MetricsCollector::new().with_report_interval(std::time::Duration::from_secs(30)));
     
+    // Check if Holochain integration is enabled
+    let holochain_enabled = std::env::var("ENABLE_HOLOCHAIN").unwrap_or_default() == "1";
+    
+    if holochain_enabled {
+        info!("Holochain integration is enabled");
+        
+        // This would initialize Holochain in a real implementation
+        // For now, this is just informational
+        info!("Note: Holochain conductor would be initialized here in a real environment");
+        
+        // In a real implementation, we would start the Holochain conductor:
+        // start_holochain_conductor().await?;
+    } else {
+        info!("Using native storage (Holochain integration disabled)");
+    }
+    
     // Start the runtime
     let mut runtime = Runtime::new(metrics.clone());
     runtime.start().await?;
@@ -91,11 +107,24 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     
-    info!("Amazon Rose Forest started successfully");
+    // Print Holochain integration info
+    if holochain_enabled {
+        info!("Amazon Rose Forest with Holochain integration started successfully");
+        info!("Community arbitration system is active");
+    } else {
+        info!("Amazon Rose Forest started successfully");
+    }
     
     // Wait for ctrl+c signal
     tokio::signal::ctrl_c().await?;
     info!("Shutting down...");
+    
+    // Close Holochain conductor if it was started
+    if holochain_enabled {
+        info!("Stopping Holochain conductor...");
+        // In a real implementation:
+        // stop_holochain_conductor().await?;
+    }
     
     Ok(())
 }

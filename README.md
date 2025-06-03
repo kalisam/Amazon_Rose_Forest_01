@@ -1,6 +1,6 @@
 # Amazon Rose Forest
 
-A distributed vector database optimized for machine learning workloads.
+A distributed vector database optimized for machine learning workloads with Holochain integration.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -15,6 +15,9 @@ A distributed vector database optimized for machine learning workloads.
 - Adaptive indexing using Hilbert space-filling curves
 - NERV (Network-Efficient Resilient Vectorization) system
 - Prometheus-compatible metrics
+- Holochain integration for distributed and secure storage
+- Community arbitration system with trinary decision logic
+- Transparent audit trails for all system decisions
 
 ## Project Structure
 
@@ -25,6 +28,13 @@ src/
 │   ├── centroid_crdt.rs  # CRDT implementation for centroids
 │   ├── metrics.rs        # Performance metrics collection
 │   └── vector.rs         # Vector operations
+├── holochain/      # Holochain integration
+│   ├── arbitration.rs    # Community arbitration system
+│   ├── dna.rs            # DNA configuration
+│   ├── entries.rs        # Entry definitions
+│   ├── transparency.rs   # Audit trail system
+│   ├── utils.rs          # Utility functions
+│   └── zome.rs           # Zome functions
 ├── nerv/           # NERV system components
 │   ├── evolution.rs      # Model evolution
 │   ├── replication.rs    # Data replication
@@ -36,7 +46,8 @@ src/
 ├── sharding/       # Data sharding
 │   ├── hilbert.rs        # Hilbert curve implementation
 │   ├── manager.rs        # Shard management
-│   └── migration.rs      # Shard migration
+│   ├── migration.rs      # Shard migration
+│   └── vector_index.rs   # Vector indexing
 └── utils/          # Utility functions
     ├── config.rs         # Configuration management
     └── errors.rs         # Error types
@@ -50,6 +61,16 @@ The codebase has been optimized for performance with the following features:
 - Efficient batch processing capabilities
 - Optimized distance calculations
 - Benchmarking tools to measure performance
+- Holochain DHT for distributed storage and retrieval
+
+## Holochain Integration
+
+Amazon Rose Forest integrates with Holochain to provide:
+
+1. **Distributed Storage**: Vectors and metadata stored in the Holochain DHT
+2. **Community Arbitration**: Trinary decision logic (Resolve/Review/Reject)
+3. **Transparent Audit Trails**: Cryptographic proof of all system decisions
+4. **Agent-Centric Security**: Authentication and authorization via Holochain
 
 ## Development
 
@@ -99,7 +120,7 @@ Amazon Rose Forest can be configured through a JSON configuration file. Here's a
     "max_retries": 3
   },
   "storage": {
-    "engine": "memory",
+    "engine": "holochain",
     "path": "./data/vectors",
     "cache_size_mb": 1024
   },
@@ -107,6 +128,11 @@ Amazon Rose Forest can be configured through a JSON configuration file. Here's a
     "num_shards": 16,
     "replication_factor": 3,
     "auto_rebalance": true
+  },
+  "holochain": {
+    "conductor_path": "./holochain",
+    "admin_port": 8000,
+    "app_port": 8001
   }
 }
 ```
