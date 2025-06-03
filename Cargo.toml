@@ -23,11 +23,16 @@ uuid = { version = "1.3", features = ["v4", "serde"] }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 hashbrown = "0.14"
+prometheus = "0.13"
+once_cell = "1.18.0"
+rand_distr = "0.4.3"
 
 [dev-dependencies]
 criterion = "0.4"
 tokio-test = "0.4"
 proptest = "1.1"
+rand = "0.8"
+rand_chacha = "0.3"
 
 [[bench]]
 name = "vector_operations"
