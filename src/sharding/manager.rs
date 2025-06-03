@@ -7,6 +7,8 @@ use tracing::{info, warn, error};
 
 use crate::core::metrics::MetricsCollector;
 use crate::sharding::migration::MigrationTask;
+use crate::sharding::vector_index::{VectorIndex, DistanceMetric};
+use crate::core::vector::Vector;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShardStatus {
@@ -34,6 +36,7 @@ pub struct ShardManager {
     shards: RwLock<HashMap<Uuid, Shard>>,
     shard_assignments: RwLock<HashMap<String, HashSet<Uuid>>>,
     migrations: RwLock<HashMap<Uuid, MigrationTask>>,
+    indices: RwLock<HashMap<Uuid, Arc<VectorIndex>>>,
 }
 
 impl ShardManager {
@@ -47,6 +50,7 @@ impl ShardManager {
             shards: RwLock::new(HashMap::new()),
             shard_assignments: RwLock::new(HashMap::new()),
             migrations: RwLock::new(HashMap::new()),
+            indices: RwLock::new(HashMap::new()),
         }
     }
     
@@ -79,6 +83,84 @@ impl ShardManager {
         info!("Created new shard '{}' with ID: {}", name, shard_id);
         
         Ok(shard_id)
+    }
+    
+    pub async fn create_vector_index(
+        &self,
+        shard_id: Uuid,
+        name: &str, 
+        dimensions: usize,
+        distance_metric: DistanceMetric,
+    ) -> Result<Arc<VectorIndex>> {
+        // Verify the shard exists
+        self.get_shard(shard_id).await?;
+        
+        // Create the index
+        let index = VectorIndex::new(
+            name, 
+            dimensions, 
+            distance_metric,
+            Some(self.metrics.clone()),
+        );
+        
+        let index = Arc::new(index);
+        
+        // Store the index
+        self.indices.write().await.insert(shard_id, index.clone());
+        
+        info!("Created new vector index '{}' with {} dimensions for shard {}", 
+              name, dimensions, shard_id);
+        
+        Ok(index)
+    }
+    
+    pub async fn get_vector_index(&self, shard_id: Uuid) -> Result<Arc<VectorIndex>> {
+        let indices = self.indices.read().await;
+        
+        indices.get(&shard_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Vector index not found for shard {}", shard_id))
+    }
+    
+    pub async fn add_vector(
+        &self,
+        shard_id: Uuid,
+        vector: Vector,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<Uuid> {
+        // Get the index
+        let index = self.get_vector_index(shard_id).await?;
+        
+        // Add the vector
+        let id = index.add(vector, metadata).await
+            .map_err(|e| anyhow!("Failed to add vector: {}", e))?;
+        
+        // Update shard vector count
+        {
+            let mut shards = self.shards.write().await;
+            if let Some(shard) = shards.get_mut(&shard_id) {
+                shard.vector_count = index.count().await;
+                shard.updated_at = chrono::Utc::now();
+            }
+        }
+        
+        Ok(id)
+    }
+    
+    pub async fn search_vectors(
+        &self,
+        shard_id: Uuid,
+        query: &Vector,
+        limit: usize,
+    ) -> Result<Vec<crate::sharding::vector_index::SearchResult>> {
+        // Get the index
+        let index = self.get_vector_index(shard_id).await?;
+        
+        // Search for vectors
+        let results = index.search(query, limit).await
+            .map_err(|e| anyhow!("Failed to search vectors: {}", e))?;
+        
+        Ok(results)
     }
     
     pub async fn get_shard(&self, shard_id: Uuid) -> Result<Shard> {
@@ -221,6 +303,7 @@ impl Clone for ShardManager {
             shards: RwLock::new(HashMap::new()),
             shard_assignments: RwLock::new(HashMap::new()),
             migrations: RwLock::new(HashMap::new()),
+            indices: RwLock::new(HashMap::new()),
         }
     }
 }
