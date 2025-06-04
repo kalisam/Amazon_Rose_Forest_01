@@ -7,6 +7,7 @@ use amazon_rose_forest::darwin::self_improvement::SelfImprovementEngine;
 use amazon_rose_forest::darwin::validation::{ValidationPipeline, UnitTestStage, PerformanceBenchmarkStage, SecurityValidationStage};
 use amazon_rose_forest::darwin::exploration::ExplorationStrategy;
 use amazon_rose_forest::darwin::agent::CodingAgent;
+use amazon_rose_forest::darwin::ritual::RitualManager;
 
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -64,6 +65,9 @@ async fn main() -> anyhow::Result<()> {
     
     // Create coding agent
     let coding_agent = Arc::new(CodingAgent::new(metrics.clone()));
+    
+    // Create ritual manager
+    let ritual_manager = Arc::new(RitualManager::new(metrics.clone()));
     
     info!("Darwin Gödel Machine components initialized");
     
@@ -145,6 +149,72 @@ async fn main() -> anyhow::Result<()> {
             
             // Wait before next iteration
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+        }
+    });
+    
+    // Create an initial learning ritual
+    let ritual_manager_clone = ritual_manager.clone();
+    tokio::spawn(async move {
+        use amazon_rose_forest::darwin::ritual::RitualStage;
+        use amazon_rose_forest::darwin::ritual::RitualStageStatus;
+        
+        // Define ritual stages
+        let stages = vec![
+            RitualStage {
+                name: "exploration".to_string(),
+                description: "Explore potential improvements".to_string(),
+                status: RitualStageStatus::Pending,
+                depends_on: Vec::new(),
+                artifacts: Vec::new(),
+                started_at: None,
+                completed_at: None,
+            },
+            RitualStage {
+                name: "validation".to_string(),
+                description: "Validate proposed improvements".to_string(),
+                status: RitualStageStatus::Pending,
+                depends_on: vec!["exploration".to_string()],
+                artifacts: Vec::new(),
+                started_at: None,
+                completed_at: None,
+            },
+            RitualStage {
+                name: "deployment".to_string(),
+                description: "Deploy approved improvements".to_string(),
+                status: RitualStageStatus::Pending,
+                depends_on: vec!["validation".to_string()],
+                artifacts: Vec::new(),
+                started_at: None,
+                completed_at: None,
+            },
+            RitualStage {
+                name: "reflection".to_string(),
+                description: "Learn from the process".to_string(),
+                status: RitualStageStatus::Pending,
+                depends_on: vec!["deployment".to_string()],
+                artifacts: Vec::new(),
+                started_at: None,
+                completed_at: None,
+            },
+        ];
+        
+        // Create ritual
+        match ritual_manager_clone.create_ritual(
+            "Initial Self-Improvement Cycle", 
+            "First cycle of self-improvement for the system",
+            stages,
+        ).await {
+            Ok(ritual_id) => {
+                info!("Created initial learning ritual with ID: {}", ritual_id);
+                
+                // Start the first stage
+                if let Err(e) = ritual_manager_clone.start_stage(ritual_id, "exploration").await {
+                    error!("Failed to start exploration stage: {}", e);
+                }
+            },
+            Err(e) => {
+                error!("Failed to create learning ritual: {}", e);
+            }
         }
     });
     

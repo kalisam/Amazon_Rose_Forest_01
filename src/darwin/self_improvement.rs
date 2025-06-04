@@ -55,6 +55,9 @@ pub struct SelfImprovementEngine {
     
     /// Maximum modifications to keep in history
     max_history_size: usize,
+    
+    /// Solution candidates for multi-candidate validation
+    solution_candidates: RwLock<HashMap<Uuid, Vec<Modification>>>,
 }
 
 impl SelfImprovementEngine {
@@ -69,6 +72,7 @@ impl SelfImprovementEngine {
             validation_pipeline,
             exploration_strategy,
             max_history_size: 1000,
+            solution_candidates: RwLock::new(HashMap::new()),
         }
     }
     
@@ -104,6 +108,115 @@ impl SelfImprovementEngine {
         });
         
         Ok(id)
+    }
+    
+    /// Propose multiple candidate solutions for the same problem
+    pub async fn propose_candidates(&self, candidates: Vec<Modification>) -> Result<Vec<Uuid>> {
+        if candidates.is_empty() {
+            return Err(anyhow!("No candidates provided"));
+        }
+        
+        let group_id = Uuid::new_v4();
+        let mut ids = Vec::new();
+        
+        // Store candidates in solution group
+        {
+            let mut solution_candidates = self.solution_candidates.write().await;
+            solution_candidates.insert(group_id, candidates.clone());
+        }
+        
+        // Store all candidates in modifications list
+        {
+            let mut modifications = self.modifications.write().await;
+            
+            for candidate in &candidates {
+                modifications.push(candidate.clone());
+                ids.push(candidate.id);
+                
+                // Update metrics
+                self.metrics.increment_counter("darwin.modifications.candidates_proposed", 1).await;
+                
+                info!("New candidate solution proposed: {} (ID: {})", candidate.name, candidate.id);
+            }
+            
+            // Trim history if needed
+            if modifications.len() > self.max_history_size {
+                modifications.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                modifications.truncate(self.max_history_size);
+            }
+        }
+        
+        // Start validation for all candidates
+        let self_clone = Arc::new(self.clone());
+        tokio::spawn(async move {
+            for candidate in &candidates {
+                if let Err(e) = self_clone.validate_modification(candidate.id).await {
+                    error!("Failed to validate candidate {}: {}", candidate.id, e);
+                }
+            }
+            
+            // After validation, select the best candidate
+            if let Err(e) = self_clone.select_best_candidate(group_id).await {
+                error!("Failed to select best candidate: {}", e);
+            }
+        });
+        
+        Ok(ids)
+    }
+    
+    /// Select the best candidate from a group of solutions
+    async fn select_best_candidate(&self, group_id: Uuid) -> Result<Uuid> {
+        // Get candidates and their validation results
+        let candidates = {
+            let candidates_map = self.solution_candidates.read().await;
+            candidates_map.get(&group_id)
+                .cloned()
+                .ok_or_else(|| anyhow!("Candidate group {} not found", group_id))?
+        };
+        
+        // Wait for all candidates to complete validation
+        let mut best_candidate: Option<(Uuid, f32)> = None;
+        let mut all_validated = true;
+        
+        for candidate in &candidates {
+            let modification = self.get_modification(candidate.id).await?;
+            
+            if modification.status != ModificationStatus::Accepted && 
+               modification.status != ModificationStatus::Rejected {
+                all_validated = false;
+                continue;
+            }
+            
+            // Calculate a score based on validation metrics
+            let score = if modification.status == ModificationStatus::Accepted {
+                // Simple scoring function based on validation metrics
+                modification.validation_metrics.values().sum::<f32>()
+            } else {
+                -1.0 // Rejected modifications get a negative score
+            };
+            
+            // Update best candidate if needed
+            if best_candidate.is_none() || score > best_candidate.unwrap().1 {
+                best_candidate = Some((candidate.id, score));
+            }
+        }
+        
+        // If not all candidates are validated yet, return error
+        if !all_validated {
+            return Err(anyhow!("Not all candidates have been validated yet"));
+        }
+        
+        // Get the best candidate
+        let best_id = best_candidate
+            .ok_or_else(|| anyhow!("No valid candidates found"))?
+            .0;
+            
+        info!("Selected best candidate {} from group {}", best_id, group_id);
+        
+        // Update metrics
+        self.metrics.increment_counter("darwin.modifications.candidates_selected", 1).await;
+        
+        Ok(best_id)
     }
     
     /// Validate a proposed modification
@@ -248,6 +361,36 @@ impl SelfImprovementEngine {
         
         Ok(ids)
     }
+    
+    /// Generate related modification from an existing one
+    pub async fn generate_related_modification(&self, base_id: Uuid, variation_type: &str) -> Result<Uuid> {
+        // Get the base modification
+        let base = self.get_modification(base_id).await?;
+        
+        // Create a new modification based on the original
+        let mut new_mod = base.clone();
+        new_mod.id = Uuid::new_v4();
+        new_mod.name = format!("{} (variation: {})", base.name, variation_type);
+        new_mod.description = format!("Variation of {} with approach: {}", base.description, variation_type);
+        new_mod.created_at = chrono::Utc::now();
+        new_mod.status = ModificationStatus::Proposed;
+        new_mod.validation_metrics = HashMap::new();
+        
+        // Modify the code changes slightly to create a variation
+        // This is a placeholder - in a real system, this would involve more sophisticated
+        // code manipulation based on the variation_type
+        for change in &mut new_mod.code_changes {
+            change.modified_content = format!("{}\n// Variation type: {}", change.modified_content, variation_type);
+            change.diff = format!("{}\n+// Variation type: {}", change.diff, variation_type);
+        }
+        
+        // Propose the new modification
+        let id = self.propose_modification(new_mod).await?;
+        
+        info!("Generated related modification {} from base {}", id, base_id);
+        
+        Ok(id)
+    }
 }
 
 // Support cloning for the engine to allow sharing between threads
@@ -259,6 +402,7 @@ impl Clone for SelfImprovementEngine {
             validation_pipeline: self.validation_pipeline.clone(),
             exploration_strategy: self.exploration_strategy.clone(),
             max_history_size: self.max_history_size,
+            solution_candidates: RwLock::new(HashMap::new()),
         }
     }
 }

@@ -29,6 +29,16 @@ pub struct Shard {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// Shard load information for balancing
+#[derive(Debug, Clone)]
+pub struct ShardLoad {
+    pub id: Uuid,
+    pub vector_count: usize,
+    pub query_rate: f32,  // Queries per second
+    pub memory_usage_mb: f32,
+    pub cpu_usage_pct: f32,
+}
+
 #[derive(Debug)]
 pub struct ShardManager {
     metrics: Arc<MetricsCollector>,
@@ -37,6 +47,7 @@ pub struct ShardManager {
     shard_assignments: RwLock<HashMap<String, HashSet<Uuid>>>,
     migrations: RwLock<HashMap<Uuid, MigrationTask>>,
     indices: RwLock<HashMap<Uuid, Arc<VectorIndex>>>,
+    shard_loads: RwLock<HashMap<Uuid, ShardLoad>>,
 }
 
 impl ShardManager {
@@ -51,6 +62,7 @@ impl ShardManager {
             shard_assignments: RwLock::new(HashMap::new()),
             migrations: RwLock::new(HashMap::new()),
             indices: RwLock::new(HashMap::new()),
+            shard_loads: RwLock::new(HashMap::new()),
         }
     }
     
@@ -76,6 +88,15 @@ impl ShardManager {
             .entry(self.node_id.clone())
             .or_insert_with(HashSet::new)
             .insert(shard_id);
+            
+        // Initialize shard load tracking
+        self.shard_loads.write().await.insert(shard_id, ShardLoad {
+            id: shard_id,
+            vector_count: 0,
+            query_rate: 0.0,
+            memory_usage_mb: 0.0,
+            cpu_usage_pct: 0.0,
+        });
             
         // Update metrics
         self.metrics.increment_counter("shards.created", 1).await;
@@ -144,6 +165,14 @@ impl ShardManager {
             }
         }
         
+        // Update shard load info
+        {
+            let mut loads = self.shard_loads.write().await;
+            if let Some(load) = loads.get_mut(&shard_id) {
+                load.vector_count = index.count().await;
+            }
+        }
+        
         Ok(id)
     }
     
@@ -159,6 +188,15 @@ impl ShardManager {
         // Search for vectors
         let results = index.search(query, limit).await
             .map_err(|e| anyhow!("Failed to search vectors: {}", e))?;
+        
+        // Update query rate in shard load
+        {
+            let mut loads = self.shard_loads.write().await;
+            if let Some(load) = loads.get_mut(&shard_id) {
+                // Simple exponential moving average for query rate
+                load.query_rate = load.query_rate * 0.9 + 0.1;  // Add one query
+            }
+        }
         
         Ok(results)
     }
@@ -289,6 +327,103 @@ impl ShardManager {
             .map(|task| (task.completed, task.progress))
             .ok_or_else(|| anyhow!("Migration with ID {} not found", migration_id))
     }
+    
+    /// Update shard load information
+    pub async fn update_shard_load(&self, shard_id: Uuid, memory_mb: f32, cpu_pct: f32) -> Result<()> {
+        let mut loads = self.shard_loads.write().await;
+        
+        let load = loads.get_mut(&shard_id)
+            .ok_or_else(|| anyhow!("Shard load info for ID {} not found", shard_id))?;
+            
+        load.memory_usage_mb = memory_mb;
+        load.cpu_usage_pct = cpu_pct;
+        
+        Ok(())
+    }
+    
+    /// Get load information for all shards
+    pub async fn get_shard_loads(&self) -> HashMap<Uuid, ShardLoad> {
+        self.shard_loads.read().await.clone()
+    }
+    
+    /// Find overloaded shards based on configurable thresholds
+    pub async fn find_overloaded_shards(
+        &self, 
+        memory_threshold_mb: f32,
+        cpu_threshold_pct: f32,
+        query_threshold_rate: f32,
+    ) -> Vec<Uuid> {
+        let loads = self.shard_loads.read().await;
+        
+        loads.values()
+            .filter(|load| {
+                load.memory_usage_mb > memory_threshold_mb ||
+                load.cpu_usage_pct > cpu_threshold_pct ||
+                load.query_rate > query_threshold_rate
+            })
+            .map(|load| load.id)
+            .collect()
+    }
+    
+    /// Hierarchical shard balancing
+    pub async fn balance_shards(&self, nodes: Vec<String>) -> Result<HashMap<Uuid, String>> {
+        if nodes.is_empty() {
+            return Err(anyhow!("No nodes provided for balancing"));
+        }
+        
+        // Get current loads
+        let loads = self.shard_loads.read().await;
+        let shards = self.shards.read().await;
+        
+        // Build a weighted distribution model
+        let mut node_weights: HashMap<String, f32> = HashMap::new();
+        for node in &nodes {
+            node_weights.insert(node.clone(), 1.0);  // Start with equal weights
+        }
+        
+        // Calculate optimal shard distribution
+        let mut distribution: HashMap<Uuid, String> = HashMap::new();
+        
+        // Sort shards by load (memory + CPU usage)
+        let mut weighted_shards: Vec<(Uuid, f32)> = loads.values()
+            .filter_map(|load| {
+                shards.get(&load.id).map(|shard| {
+                    // Calculate a weighted score based on resource usage
+                    let weight = load.memory_usage_mb * 0.6 + load.cpu_usage_pct * 0.3 + load.query_rate * 0.1;
+                    (load.id, weight)
+                })
+            })
+            .collect();
+            
+        weighted_shards.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        
+        // Distribute shards using hierarchical approach
+        let mut node_loads: HashMap<String, f32> = HashMap::new();
+        for node in &nodes {
+            node_loads.insert(node.clone(), 0.0);
+        }
+        
+        for (shard_id, weight) in weighted_shards {
+            // Find the least loaded node
+            let target_node = node_loads.iter()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(node, _)| node.clone())
+                .unwrap_or_else(|| nodes[0].clone());
+                
+            // Assign shard to node
+            distribution.insert(shard_id, target_node.clone());
+            
+            // Update node load
+            if let Some(load) = node_loads.get_mut(&target_node) {
+                *load += weight;
+            }
+        }
+        
+        info!("Hierarchical shard balancing complete, recommended moves: {}", 
+              distribution.len());
+        
+        Ok(distribution)
+    }
 }
 
 // Support cloning for the manager to allow sharing between threads
@@ -304,6 +439,7 @@ impl Clone for ShardManager {
             shard_assignments: RwLock::new(HashMap::new()),
             migrations: RwLock::new(HashMap::new()),
             indices: RwLock::new(HashMap::new()),
+            shard_loads: RwLock::new(HashMap::new()),
         }
     }
 }
