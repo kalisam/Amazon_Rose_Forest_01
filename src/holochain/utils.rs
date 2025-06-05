@@ -5,6 +5,7 @@ use crate::core::vector::Vector;
 use crate::holochain::VectorEntry;
 use uuid::Uuid;
 use std::collections::HashMap;
+use sha2::{Sha256, Digest};
 
 /// Convert a Vector to a Holochain VectorEntry
 pub fn vector_to_entry(vector: Vector, metadata: Option<HashMap<String, String>>) -> VectorEntry {
@@ -62,15 +63,19 @@ pub fn timestamp_tag() -> LinkTag {
     LinkTag::new(now.to_be_bytes().to_vec())
 }
 
-/// Generate a deterministic hash from content
+/// Generate a deterministic hash from content using SHA-256
 pub fn hash_content(content: &str) -> String {
-    // This is a simplified implementation
-    // In a real-world scenario, this would use a proper cryptographic hash function
-    let mut hash = String::new();
-    for byte in content.bytes() {
-        hash.push_str(&format!("{:02x}", byte));
-    }
-    hash
+    // Use SHA-256 for secure cryptographic hashing
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let result = hasher.finalize();
+    
+    // Convert to hexadecimal string
+    let hash_string = result.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+        
+    hash_string
 }
 
 /// Generate an embedding from text

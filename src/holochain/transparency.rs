@@ -4,6 +4,7 @@ use hdk::prelude::*;
 use crate::holochain::entries::AuditTrail;
 use crate::holochain::utils::{sys_time, create_path, timestamp_tag};
 use std::collections::HashMap;
+use sha2::{Sha256, Digest};
 
 /// Public API for transparency verification
 #[hdk_extern]
@@ -128,16 +129,32 @@ fn reconstruct_audit_trail(details: Details) -> ExternResult<AuditTrail> {
 
 /// Verify a Merkle proof
 fn verify_merkle_proof(proof: &str) -> ExternResult<()> {
-    // This would verify the Merkle proof in a real implementation
-    // For now, this is a stub
+    // This is a stub that should be properly implemented
+    // For now, we'll just check that the proof is not empty
+    if proof.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Empty Merkle proof".to_string())));
+    }
     Ok(())
 }
 
 /// Generate a Merkle proof
 fn generate_merkle_proof(content: &str) -> ExternResult<String> {
-    // This would generate a real Merkle proof in a real implementation
-    // For now, return a placeholder
-    Ok("merkle_proof_placeholder".to_string())
+    // Create a SHA-256 hash of the content as the base of our proof
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let result = hasher.finalize();
+    
+    // Convert to hexadecimal string
+    let hash_string = result.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    
+    // In a real implementation, we would create a proper Merkle proof
+    // This would involve creating a Merkle tree and generating a proof
+    // For now, we'll use the hash as a simple placeholder
+    let proof = format!("merkle:sha256:{}", hash_string);
+    
+    Ok(proof)
 }
 
 /// Count all decisions in the system
