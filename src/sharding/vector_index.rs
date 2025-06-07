@@ -126,7 +126,7 @@ impl VectorIndex {
     /// Convert a vector to a Hilbert index
     fn vector_to_hilbert_index(&self, vector: &Vector) -> u64 {
         // Normalize the vector components to fit within our bit range
-        let max_value = (1 << self.hilbert_curve.bits_per_dimension) - 1;
+        let max_value = (1 << self.hilbert_curve.bits_per_dimension()) - 1;
         let point: Vec<u64> = vector.values.iter()
             .map(|&v| {
                 // Map from [-1.0, 1.0] to [0, max_value]
@@ -253,7 +253,7 @@ impl VectorIndex {
         let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
         
         // Collect candidate vectors
-        let mut candidates: Vec<(Uuid, &VectorEntry)> = Vec::new();
+        let mut candidates: Vec<(Uuid, VectorEntry)> = Vec::new();
         {
             let vectors = self.vectors.read().await;
             let hilbert_map = self.hilbert_map.read().await;
@@ -262,7 +262,7 @@ impl VectorIndex {
                 if let Some(ids) = hilbert_map.get(&index) {
                     for &id in ids {
                         if let Some(entry) = vectors.get(&id) {
-                            candidates.push((id, entry));
+                            candidates.push((id, entry.clone()));
                         }
                     }
                 }
@@ -271,18 +271,18 @@ impl VectorIndex {
             // If we have too few candidates, fall back to linear search
             if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
                 debug!("Falling back to linear search for index '{}'", self.name);
-                candidates = vectors.iter().map(|(&id, entry)| (id, entry)).collect();
+                candidates = vectors.iter().map(|(&id, entry)| (id, entry.clone())).collect();
             }
         }
-        
+
         // Calculate distances
-        let mut results: Vec<SearchResult> = candidates.iter()
-            .map(|&(id, entry)| {
+        let mut results: Vec<SearchResult> = candidates.into_iter()
+            .map(|(id, entry)| {
                 let score = self.distance_metric.calculate(query, &entry.vector);
                 SearchResult {
                     id,
-                    vector: entry.vector.clone(),
-                    metadata: entry.metadata.clone(),
+                    vector: entry.vector,
+                    metadata: entry.metadata,
                     score,
                 }
             })
