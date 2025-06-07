@@ -9,7 +9,7 @@ use crate::darwin::self_improvement::Modification;
 use crate::core::metrics::MetricsCollector;
 
 /// Strategy for exploring potential system improvements
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ExplorationStrategy {
     /// Metrics collector
     metrics: Arc<MetricsCollector>,
@@ -341,10 +341,14 @@ impl ExplorationStrategy {
     ) -> Result<()> {
         let mut archive = self.archive.write().await;
         let params = self.parameters.read().await;
-        
+
         // Generate feature descriptors for quality-diversity
         let features = self.extract_features(&modification, &metrics);
-        
+
+        // Precompute fields used after moving values
+        let mod_id = modification.id;
+        let score = metrics.values().sum();
+
         // Create archive entry
         let entry = ArchiveEntry {
             modification,
@@ -358,9 +362,8 @@ impl ExplorationStrategy {
         archive.insert(key, entry);
         
         // Add to novelty archive
-        let score = metrics.values().sum();
         let novelty_point = NoveltyPoint {
-            id: modification.id,
+            id: mod_id,
             features,
             score,
             added_at: chrono::Utc::now(),

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
-use std::simd::{f32x4, mask32x4, StdFloat};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
@@ -36,7 +35,7 @@ impl Vector {
     }
     
     pub fn random_normal(dimensions: usize, mean: f32, std_dev: f32) -> Self {
-        use rand::distributions::{Distribution, Normal};
+        use rand_distr::{Distribution, Normal};
         let normal = Normal::new(mean as f64, std_dev as f64).unwrap();
         let mut rng = rand::thread_rng();
         let values = (0..dimensions)
@@ -48,31 +47,13 @@ impl Vector {
     pub fn dot(&self, other: &Vector) -> f32 {
         assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
         
-        // Use SIMD acceleration for vectors with dimensions divisible by 4
-        if self.dimensions % 4 == 0 {
-            self.dot_simd(other)
-        } else {
-            self.dot_scalar(other)
-        }
+        self.dot_scalar(other)
     }
     
     fn dot_scalar(&self, other: &Vector) -> f32 {
         self.values.iter().zip(other.values.iter()).map(|(a, b)| a * b).sum()
     }
     
-    fn dot_simd(&self, other: &Vector) -> f32 {
-        let chunks = self.dimensions / 4;
-        let mut sum = f32x4::splat(0.0);
-        
-        for i in 0..chunks {
-            let start = i * 4;
-            let a = f32x4::from_slice(&self.values[start..start + 4]);
-            let b = f32x4::from_slice(&other.values[start..start + 4]);
-            sum += a * b;
-        }
-        
-        sum.horizontal_sum()
-    }
     
     pub fn magnitude(&self) -> f32 {
         self.dot(self).sqrt()
@@ -105,12 +86,7 @@ impl Vector {
     pub fn euclidean_distance(&self, other: &Vector) -> f32 {
         assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
         
-        // Use SIMD acceleration for vectors with dimensions divisible by 4
-        if self.dimensions % 4 == 0 {
-            self.euclidean_distance_simd(other)
-        } else {
-            self.euclidean_distance_scalar(other)
-        }
+        self.euclidean_distance_scalar(other)
     }
     
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {
@@ -123,20 +99,6 @@ impl Vector {
         sum_squared_diff.sqrt()
     }
     
-    fn euclidean_distance_simd(&self, other: &Vector) -> f32 {
-        let chunks = self.dimensions / 4;
-        let mut sum = f32x4::splat(0.0);
-        
-        for i in 0..chunks {
-            let start = i * 4;
-            let a = f32x4::from_slice(&self.values[start..start + 4]);
-            let b = f32x4::from_slice(&other.values[start..start + 4]);
-            let diff = a - b;
-            sum += diff * diff;
-        }
-        
-        sum.horizontal_sum().sqrt()
-    }
     
     pub fn manhattan_distance(&self, other: &Vector) -> f32 {
         assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");

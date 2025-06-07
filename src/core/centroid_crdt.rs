@@ -130,8 +130,9 @@ impl CentroidCRDT {
             },
         }
         
-        self.operations.insert(operation.id, operation);
-        self.observed.insert(operation.id);
+        let op_id = operation.id;
+        self.operations.insert(op_id, operation);
+        self.observed.insert(op_id);
     }
     
     pub fn merge(&mut self, other: &CentroidCRDT) {

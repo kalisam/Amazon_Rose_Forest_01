@@ -20,6 +20,11 @@ impl HilbertCurve {
             bits_per_dimension,
         }
     }
+
+    /// Get the bits per dimension value
+    pub fn bits_per_dimension(&self) -> usize {
+        self.bits_per_dimension
+    }
     
     /// Convert a multidimensional point to its Hilbert index
     pub fn point_to_index(&self, point: &[u64]) -> u64 {
@@ -30,7 +35,7 @@ impl HilbertCurve {
             assert!(p < (1 << self.bits_per_dimension), "Coordinate exceeds maximum for bits_per_dimension");
         }
         
-        let mut index = 0;
+        let mut index: u64 = 0;
         let max_bit = 1 << (self.bits_per_dimension - 1);
         
         // For each bit position, from most significant to least significant
@@ -46,7 +51,7 @@ impl HilbertCurve {
             }
             
             // Interleave the bits into the result
-            index = (index << self.dimensions) | self.transform_bits(current_bits, self.dimensions);
+            index = (index << self.dimensions) | self.transform_bits(current_bits, self.dimensions) as u64;
         }
         
         index
