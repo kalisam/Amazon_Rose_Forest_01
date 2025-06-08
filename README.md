@@ -80,6 +80,13 @@ Amazon Rose Forest integrates with Holochain to provide:
 cargo build
 ```
 
+To enable functions that interact with the Holochain conductor, compile with the
+`holochain_conductor` feature:
+
+```bash
+cargo build --features holochain_conductor
+```
+
 ### Running
 
 ```bash

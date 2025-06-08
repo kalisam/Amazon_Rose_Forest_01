@@ -48,7 +48,7 @@ rand_chacha = "0.3"
 [features]
 default = []
 formal_verification = []
-holochain_conductor = ["holochain"]
+holochain_conductor = ["holochain"] # enables conductor integration functions
 
 [[bench]]
 name = "vector_operations"
