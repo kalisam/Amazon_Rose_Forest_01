@@ -4,6 +4,7 @@ use tracing::{info, warn, error, debug};
 use uuid::Uuid;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
+use rand::prelude::*;
 
 use crate::darwin::self_improvement::Modification;
 use crate::core::metrics::MetricsCollector;
@@ -608,5 +609,3 @@ pub struct ArchiveStats {
     pub top_scores: Vec<(Uuid, f32)>,
 }
 
-// Add missing imports
-use rand::prelude::*;
