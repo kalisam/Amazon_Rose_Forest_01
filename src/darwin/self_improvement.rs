@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use dashmap::DashMap;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 use uuid::Uuid;
@@ -57,7 +58,7 @@ pub struct SelfImprovementEngine {
     max_history_size: usize,
     
     /// Solution candidates for multi-candidate validation
-    solution_candidates: RwLock<HashMap<Uuid, Vec<Modification>>>,
+    solution_candidates: DashMap<Uuid, Vec<Modification>>,
 }
 
 impl SelfImprovementEngine {
@@ -72,7 +73,7 @@ impl SelfImprovementEngine {
             validation_pipeline,
             exploration_strategy,
             max_history_size: 1000,
-            solution_candidates: RwLock::new(HashMap::new()),
+            solution_candidates: DashMap::new(),
         }
     }
     
@@ -120,10 +121,7 @@ impl SelfImprovementEngine {
         let mut ids = Vec::new();
         
         // Store candidates in solution group
-        {
-            let mut solution_candidates = self.solution_candidates.write().await;
-            solution_candidates.insert(group_id, candidates.clone());
-        }
+        self.solution_candidates.insert(group_id, candidates.clone());
         
         // Store all candidates in modifications list
         {
@@ -167,12 +165,9 @@ impl SelfImprovementEngine {
     /// Select the best candidate from a group of solutions
     async fn select_best_candidate(&self, group_id: Uuid) -> Result<Uuid> {
         // Get candidates and their validation results
-        let candidates = {
-            let candidates_map = self.solution_candidates.read().await;
-            candidates_map.get(&group_id)
-                .cloned()
-                .ok_or_else(|| anyhow!("Candidate group {} not found", group_id))?
-        };
+        let candidates = self.solution_candidates.get(&group_id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| anyhow!("Candidate group {} not found", group_id))?;
         
         // Wait for all candidates to complete validation
         let mut best_candidate: Option<(Uuid, f32)> = None;
@@ -402,7 +397,7 @@ impl Clone for SelfImprovementEngine {
             validation_pipeline: self.validation_pipeline.clone(),
             exploration_strategy: self.exploration_strategy.clone(),
             max_history_size: self.max_history_size,
-            solution_candidates: RwLock::new(HashMap::new()),
+            solution_candidates: DashMap::new(),
         }
     }
 }
