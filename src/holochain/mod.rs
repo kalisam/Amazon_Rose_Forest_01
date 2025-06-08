@@ -7,6 +7,8 @@ pub mod utils;
 pub mod arbitration;
 pub mod transparency;
 
+pub use utils::sys_time;
+
 use hdk::prelude::*;
 use uuid::Uuid;
 use crate::core::vector::Vector;
@@ -88,12 +90,6 @@ pub struct AuditTrail {
     
     /// Timestamp with nanosecond precision
     pub timestamp: u64,
-}
-
-/// Get the current system time
-fn sys_time() -> ExternResult<u64> {
-    let time = sys_time_precise()?;
-    Ok(time.as_micros() as u64)
 }
 
 /// DNA properties configuration
