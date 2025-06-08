@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
@@ -406,6 +407,3 @@ impl Clone for SelfImprovementEngine {
         }
     }
 }
-
-// Add missing HashMap import
-use std::collections::HashMap;
