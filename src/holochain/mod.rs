@@ -6,12 +6,14 @@ pub mod entries;
 pub mod utils;
 pub mod arbitration;
 pub mod transparency;
+pub mod hash;
 
 use hdk::prelude::*;
 use uuid::Uuid;
 use crate::core::vector::Vector;
 use crate::core::centroid::Centroid;
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
 /// Entry definition for a vector in Holochain
 #[hdk_entry(id = "vector")]
@@ -80,8 +82,9 @@ pub struct AuditTrail {
     /// Who participated in validation
     pub validators: Vec<AgentPubKey>,
     
-    /// Cryptographic proof of decision process  
-    pub decision_proof: String,
+    /// Cryptographic proof of decision process
+    #[serde(with = "serde_bytes")]
+    pub decision_proof: Vec<u8>,
     
     /// Human-readable justification
     pub justification: String,
