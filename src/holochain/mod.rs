@@ -31,7 +31,7 @@ impl From<Vector> for VectorEntry {
             values: vector.values.clone(),
             dimensions: vector.dimensions,
             metadata: None,
-            created_at: sys_time()?,
+            created_at: sys_time().unwrap_or(0),
         }
     }
 }
