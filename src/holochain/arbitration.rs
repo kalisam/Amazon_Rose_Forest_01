@@ -6,6 +6,7 @@ use crate::holochain::entries::{
 };
 use crate::holochain::utils::{sys_time, create_path, timestamp_tag};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Input for conflict arbitration
 #[derive(Serialize, Deserialize, Debug)]
