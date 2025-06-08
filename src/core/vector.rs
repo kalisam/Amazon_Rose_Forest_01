@@ -36,7 +36,7 @@ impl Vector {
     }
     
     pub fn random_normal(dimensions: usize, mean: f32, std_dev: f32) -> Self {
-        use rand::distributions::{Distribution, Normal};
+        use rand_distr::{Distribution, Normal};
         let normal = Normal::new(mean as f64, std_dev as f64).unwrap();
         let mut rng = rand::thread_rng();
         let values = (0..dimensions)
