@@ -86,7 +86,7 @@ pub struct AuditTrail {
     /// Human-readable justification
     pub justification: String,
     
-    /// Timestamp with nanosecond precision
+    /// Timestamp with microsecond precision
     pub timestamp: u64,
 }
 
