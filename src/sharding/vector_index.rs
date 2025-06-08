@@ -253,7 +253,7 @@ impl VectorIndex {
         let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
         
         // Collect candidate vectors
-        let mut candidates: Vec<(Uuid, &VectorEntry)> = Vec::new();
+        let mut candidates: Vec<VectorEntry> = Vec::new();
         {
             let vectors = self.vectors.read().await;
             let hilbert_map = self.hilbert_map.read().await;
@@ -262,7 +262,7 @@ impl VectorIndex {
                 if let Some(ids) = hilbert_map.get(&index) {
                     for &id in ids {
                         if let Some(entry) = vectors.get(&id) {
-                            candidates.push((id, entry));
+                            candidates.push(entry.clone());
                         }
                     }
                 }
@@ -271,16 +271,17 @@ impl VectorIndex {
             // If we have too few candidates, fall back to linear search
             if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
                 debug!("Falling back to linear search for index '{}'", self.name);
-                candidates = vectors.iter().map(|(&id, entry)| (id, entry)).collect();
+                candidates = vectors.values().cloned().collect();
             }
         }
         
         // Calculate distances
-        let mut results: Vec<SearchResult> = candidates.iter()
-            .map(|&(id, entry)| {
+        let mut results: Vec<SearchResult> = candidates
+            .iter()
+            .map(|entry| {
                 let score = self.distance_metric.calculate(query, &entry.vector);
                 SearchResult {
-                    id,
+                    id: entry.id,
                     vector: entry.vector.clone(),
                     metadata: entry.metadata.clone(),
                     score,

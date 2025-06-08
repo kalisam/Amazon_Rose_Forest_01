@@ -345,10 +345,12 @@ impl ExplorationStrategy {
         // Generate feature descriptors for quality-diversity
         let features = self.extract_features(&modification, &metrics);
         
-        // Create archive entry
+        let mod_id = modification.id;
+        let score = metrics.values().sum();
+
         let entry = ArchiveEntry {
             modification,
-            metrics,
+            metrics: metrics.clone(),
             features: features.clone(),
             added_at: chrono::Utc::now(),
         };
@@ -358,9 +360,8 @@ impl ExplorationStrategy {
         archive.insert(key, entry);
         
         // Add to novelty archive
-        let score = metrics.values().sum();
         let novelty_point = NoveltyPoint {
-            id: modification.id,
+            id: mod_id,
             features,
             score,
             added_at: chrono::Utc::now(),

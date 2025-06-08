@@ -104,23 +104,31 @@ impl RitualManager {
         let ritual = rituals.get_mut(&ritual_id)
             .ok_or_else(|| anyhow!("Ritual with ID {} not found", ritual_id))?;
             
-        // Find the stage
-        let stage = ritual.stages.iter_mut()
-            .find(|s| s.name == stage_name)
+        // Find the stage position first to avoid simultaneous mutable and immutable borrows
+        let stage_pos = ritual
+            .stages
+            .iter()
+            .position(|s| s.name == stage_name)
             .ok_or_else(|| anyhow!("Stage {} not found in ritual {}", stage_name, ritual_id))?;
-            
-        // Check dependencies
-        for dep_name in &stage.depends_on {
-            let dep_stage = ritual.stages.iter()
-                .find(|s| &s.name == dep_name)
-                .ok_or_else(|| anyhow!("Dependency stage {} not found", dep_name))?;
-                
-            if dep_stage.status != RitualStageStatus::Completed {
-                return Err(anyhow!("Dependency stage {} is not completed", dep_name));
+
+        {
+            // Check dependencies using an immutable borrow
+            let stage_ref = &ritual.stages[stage_pos];
+            for dep_name in &stage_ref.depends_on {
+                let dep_stage = ritual
+                    .stages
+                    .iter()
+                    .find(|s| &s.name == dep_name)
+                    .ok_or_else(|| anyhow!("Dependency stage {} not found", dep_name))?;
+
+                if dep_stage.status != RitualStageStatus::Completed {
+                    return Err(anyhow!("Dependency stage {} is not completed", dep_name));
+                }
             }
         }
-        
-        // Update stage status
+
+        // Now mutate the stage
+        let stage = &mut ritual.stages[stage_pos];
         stage.status = RitualStageStatus::InProgress;
         stage.started_at = Some(Utc::now());
         ritual.updated_at = Utc::now();
