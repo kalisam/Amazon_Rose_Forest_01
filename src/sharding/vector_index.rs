@@ -97,22 +97,34 @@ pub struct VectorIndex {
 impl VectorIndex {
     /// Create a new vector index
     pub fn new(
-        name: &str, 
-        dimensions: usize, 
+        name: &str,
+        dimensions: usize,
         distance_metric: DistanceMetric,
         metrics: Option<Arc<MetricsCollector>>,
-    ) -> Self {
-        // Determine bits per dimension based on dimensions
-        // We want to keep the total bits under 64 (for u64 hilbert index)
-        let max_total_bits = 60; // Leave some room for safety
-        let bits_per_dimension = std::cmp::min(
-            10, // Maximum reasonable value
-            max_total_bits / dimensions
-        );
-        
+    ) -> Result<Self, String> {
+        let max_total_bits = 60;
+
+        if dimensions == 0 {
+            return Err("dimensions must be greater than zero".to_string());
+        }
+        if dimensions > max_total_bits {
+            return Err(format!(
+                "dimensions ({}) exceed maximum supported {}",
+                dimensions, max_total_bits
+            ));
+        }
+
+        let bits_per_dimension = std::cmp::min(10, max_total_bits / dimensions);
+        if bits_per_dimension == 0 {
+            return Err(format!(
+                "calculated bits_per_dimension is zero for {} dimensions",
+                dimensions
+            ));
+        }
+
         let hilbert_curve = HilbertCurve::new(dimensions, bits_per_dimension);
-        
-        Self {
+
+        Ok(Self {
             name: name.to_string(),
             vectors: RwLock::new(HashMap::new()),
             hilbert_curve,
@@ -120,7 +132,7 @@ impl VectorIndex {
             dimensions,
             distance_metric,
             metrics,
-        }
+        })
     }
     
     /// Convert a vector to a Hilbert index
@@ -432,7 +444,7 @@ mod tests {
     use rand::Rng;
     
     async fn create_test_index(vector_count: usize, dimensions: usize) -> VectorIndex {
-        let index = VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None);
+        let index = VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
         
         // Add random vectors
         for _ in 0..vector_count {
@@ -454,7 +466,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_remove() {
-        let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None);
+        let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None).unwrap();
         
         // Add a vector
         let vector = Vector::random(3);
@@ -512,7 +524,7 @@ mod tests {
         // Test each metric
         for metric in [DistanceMetric::Euclidean, DistanceMetric::Cosine, 
                       DistanceMetric::Manhattan, DistanceMetric::Hamming].iter() {
-            let index = VectorIndex::new("test_metric", dimensions, *metric, None);
+            let index = VectorIndex::new("test_metric", dimensions, *metric, None).unwrap();
             
             // Add all vectors
             for v in &vectors {
