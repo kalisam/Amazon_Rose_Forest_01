@@ -548,4 +548,30 @@ mod tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_stats() {
+        // Build a small index with known vectors so we can predict stats
+        let dimensions = 3;
+        let index = VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None);
+
+        let vectors = vec![
+            Vector::new(vec![0.1, 0.2, 0.3]),
+            Vector::new(vec![-0.4, 0.5, -0.6]),
+            Vector::new(vec![0.7, -0.8, 0.9]),
+        ];
+
+        use std::collections::HashSet;
+        let mut buckets = HashSet::new();
+        for v in &vectors {
+            // Track expected bucket count by using the same mapping as the index
+            buckets.insert(index.vector_to_hilbert_index(v));
+            index.add(v.clone(), None).await.unwrap();
+        }
+
+        let stats = index.stats().await;
+        assert_eq!(stats.vector_count, vectors.len());
+        assert_eq!(stats.dimensions, dimensions);
+        assert_eq!(stats.bucket_count, buckets.len());
+    }
 }
