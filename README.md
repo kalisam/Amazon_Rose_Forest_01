@@ -74,6 +74,10 @@ Amazon Rose Forest integrates with Holochain to provide:
 
 ## Development
 
+### Dependencies
+
+- `warp` 0.3 is used for the HTTP API layer.
+
 ### Building
 
 ```bash
