@@ -8,7 +8,7 @@ A distributed vector database optimized for machine learning workloads with Holo
 ## Features
 
 - High-performance vector search with multiple distance metrics (Euclidean, Cosine, Manhattan, Hamming)
-- SIMD-accelerated vector operations for improved performance
+- (Rust Nightly ONLY) SIMD-accelerated vector operations for improved performance
 - Distributed architecture with automatic sharding
 - CRDT-based replication for high availability
 - Circuit breaker pattern for fault tolerance
