@@ -95,7 +95,14 @@ Amazon Rose Forest integrates with Holochain to provide:
 cargo build
 ```
 
-The project uses `std::simd` for fast vector math. This API is only
+To enable functions that interact with the Holochain conductor, compile with the
+`holochain_conductor` feature:
+
+```bash
+cargo build --features holochain_conductor
+```
+
+The project CAN use `std::simd` for fast vector math. This API is only
 available on the Rust nightly toolchain. Install it with:
 
 ```bash
@@ -115,7 +122,7 @@ enable the `holochain_conductor` feature:
 cargo +nightly build --features holochain_conductor
 ```
 
-If you remove SIMD support from the code you can build with stable Rust.
+ SIMD support removed by default from the code so you can build with stable Rust.
 
 ### Running
 
