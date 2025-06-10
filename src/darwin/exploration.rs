@@ -101,11 +101,11 @@ impl ExplorationStrategy {
     pub async fn generate_proposals(&self) -> Result<Vec<Modification>> {
         let mut proposals = Vec::new();
 
-        // Get current archive
-        let archive = self.archive.read().await;
-      
+        // Snapshot the current archive
+        let archive = self.archive.clone();
+
         // Get current archive length
-        let archive_len = self.archive.len();
+        let archive_len = archive.len();
         let params = self.parameters.read().await;
 
         // If archive is empty, generate some initial proposals
@@ -117,14 +117,14 @@ impl ExplorationStrategy {
             // 1. Mutation of existing solutions
 
             let mutation_count = (archive_len as f32 * params.mutation_rate).ceil() as usize;
-            proposals.extend(self.generate_mutations(&self.archive, mutation_count).await?);
+            proposals.extend(self.generate_mutations(&archive, mutation_count).await?);
 
             // 2. Crossover between existing solutions
             let crossover_count = (archive_len as f32 * params.crossover_rate).ceil() as usize;
-            proposals.extend(self.generate_crossovers(&self.archive, crossover_count).await?);
+            proposals.extend(self.generate_crossovers(&archive, crossover_count).await?);
 
             // 3. Novelty search for unexplored areas
-            proposals.extend(self.generate_novelty_search(&self.archive).await?);
+            proposals.extend(self.generate_novelty_search(&archive).await?);
         }
 
         // Update metrics
