@@ -2,20 +2,22 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn, error, debug};
 use uuid::Uuid;
+use dashmap::DashMap;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
+use rand::prelude::*;
 
 use crate::darwin::self_improvement::Modification;
 use crate::core::metrics::MetricsCollector;
 
 /// Strategy for exploring potential system improvements
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ExplorationStrategy {
     /// Metrics collector
     metrics: Arc<MetricsCollector>,
     
     /// Archive of previously explored solutions
-    archive: RwLock<HashMap<String, ArchiveEntry>>,
+    archive: DashMap<String, ArchiveEntry>,
     
     /// Current exploration parameters
     parameters: RwLock<ExplorationParameters>,
@@ -80,7 +82,7 @@ impl ExplorationStrategy {
     pub fn new(metrics: Arc<MetricsCollector>) -> Self {
         Self {
             metrics,
-            archive: RwLock::new(HashMap::new()),
+            archive: DashMap::new(),
             parameters: RwLock::new(ExplorationParameters {
                 mutation_rate: 0.1,
                 crossover_rate: 0.3,
@@ -97,26 +99,26 @@ impl ExplorationStrategy {
     pub async fn generate_proposals(&self) -> Result<Vec<Modification>> {
         let mut proposals = Vec::new();
         
-        // Get current archive
-        let archive = self.archive.read().await;
+        // Get current archive length
+        let archive_len = self.archive.len();
         let params = self.parameters.read().await;
-        
+
         // If archive is empty, generate some initial proposals
-        if archive.is_empty() {
+        if archive_len == 0 {
             proposals.extend(self.generate_initial_proposals().await?);
         } else {
             // Generate proposals through various strategies
-            
+
             // 1. Mutation of existing solutions
-            let mutation_count = (archive.len() as f32 * params.mutation_rate).ceil() as usize;
-            proposals.extend(self.generate_mutations(&archive, mutation_count).await?);
-            
+            let mutation_count = (archive_len as f32 * params.mutation_rate).ceil() as usize;
+            proposals.extend(self.generate_mutations(&self.archive, mutation_count).await?);
+
             // 2. Crossover between existing solutions
-            let crossover_count = (archive.len() as f32 * params.crossover_rate).ceil() as usize;
-            proposals.extend(self.generate_crossovers(&archive, crossover_count).await?);
-            
+            let crossover_count = (archive_len as f32 * params.crossover_rate).ceil() as usize;
+            proposals.extend(self.generate_crossovers(&self.archive, crossover_count).await?);
+
             // 3. Novelty search for unexplored areas
-            proposals.extend(self.generate_novelty_search(&archive).await?);
+            proposals.extend(self.generate_novelty_search(&self.archive).await?);
         }
         
         // Update metrics
@@ -153,14 +155,14 @@ impl ExplorationStrategy {
     /// Generate mutations of existing solutions
     async fn generate_mutations(
         &self,
-        archive: &HashMap<String, ArchiveEntry>,
+        archive: &DashMap<String, ArchiveEntry>,
         count: usize,
     ) -> Result<Vec<Modification>> {
         let mut proposals = Vec::new();
         let mut rng = rand::thread_rng();
         
         // Select random entries to mutate
-        let entries: Vec<&ArchiveEntry> = archive.values().collect();
+        let entries: Vec<ArchiveEntry> = archive.iter().map(|e| e.value().clone()).collect();
         
         for _ in 0..count {
             if let Some(entry) = entries.choose(&mut rng) {
@@ -185,14 +187,14 @@ impl ExplorationStrategy {
     /// Generate crossovers between existing solutions
     async fn generate_crossovers(
         &self,
-        archive: &HashMap<String, ArchiveEntry>,
+        archive: &DashMap<String, ArchiveEntry>,
         count: usize,
     ) -> Result<Vec<Modification>> {
         let mut proposals = Vec::new();
         let mut rng = rand::thread_rng();
         
         // Select random pairs of entries to crossover
-        let entries: Vec<&ArchiveEntry> = archive.values().collect();
+        let entries: Vec<ArchiveEntry> = archive.iter().map(|e| e.value().clone()).collect();
         
         for _ in 0..count {
             if entries.len() < 2 {
@@ -221,7 +223,7 @@ impl ExplorationStrategy {
     /// Generate proposals using novelty search
     async fn generate_novelty_search(
         &self,
-        archive: &HashMap<String, ArchiveEntry>,
+        archive: &DashMap<String, ArchiveEntry>,
     ) -> Result<Vec<Modification>> {
         // In a real implementation, this would use novelty search to explore
         // underrepresented areas of the solution space
@@ -301,16 +303,16 @@ impl ExplorationStrategy {
     }
     
     /// Tournament selection for choosing parents
-    async fn tournament_selection(&self, archive: &HashMap<String, ArchiveEntry>) -> Option<ArchiveEntry> {
+    async fn tournament_selection(&self, archive: &DashMap<String, ArchiveEntry>) -> Option<ArchiveEntry> {
         let params = self.parameters.read().await;
         let mut rng = rand::thread_rng();
         
         // If archive is too small, just return a random entry
         if archive.len() <= 1 {
-            return archive.values().next().cloned();
+            return archive.iter().next().map(|e| e.value().clone());
         }
-        
-        let entries: Vec<&ArchiveEntry> = archive.values().collect();
+
+        let entries: Vec<ArchiveEntry> = archive.iter().map(|e| e.value().clone()).collect();
         
         // Select tournament_size random entries
         let tournament_size = std::cmp::min(params.tournament_size, entries.len());
@@ -318,7 +320,7 @@ impl ExplorationStrategy {
         
         for _ in 0..tournament_size {
             if let Some(entry) = entries.choose(&mut rng) {
-                tournament.push(*entry);
+                tournament.push(entry.clone());
             }
         }
         
@@ -330,7 +332,6 @@ impl ExplorationStrategy {
                 let b_score: f32 = b.metrics.values().sum();
                 a_score.partial_cmp(&b_score).unwrap()
             })
-            .cloned()
     }
     
     /// Add a validated modification to the archive
@@ -339,12 +340,15 @@ impl ExplorationStrategy {
         modification: Modification,
         metrics: HashMap<String, f32>,
     ) -> Result<()> {
-        let mut archive = self.archive.write().await;
         let params = self.parameters.read().await;
-        
+
         // Generate feature descriptors for quality-diversity
         let features = self.extract_features(&modification, &metrics);
-        
+
+        // Precompute fields used after moving values
+        let mod_id = modification.id;
+        let score = metrics.values().sum();
+
         // Create archive entry
         let entry = ArchiveEntry {
             modification,
@@ -355,12 +359,11 @@ impl ExplorationStrategy {
         
         // Add to archive
         let key = entry.modification.id.to_string();
-        archive.insert(key, entry);
+        self.archive.insert(key, entry);
         
         // Add to novelty archive
-        let score = metrics.values().sum();
         let novelty_point = NoveltyPoint {
-            id: modification.id,
+            id: mod_id,
             features,
             score,
             added_at: chrono::Utc::now(),
@@ -380,12 +383,12 @@ impl ExplorationStrategy {
         }
         
         // Trim archive if needed
-        if archive.len() > params.max_archive_size {
-            self.trim_archive(&mut archive).await?;
+        if self.archive.len() > params.max_archive_size {
+            self.trim_archive().await?;
         }
         
         // Update metrics
-        self.metrics.set_gauge("darwin.exploration.archive_size", archive.len() as u64).await;
+        self.metrics.set_gauge("darwin.exploration.archive_size", self.archive.len() as u64).await;
         
         Ok(())
     }
@@ -468,22 +471,22 @@ impl ExplorationStrategy {
     }
     
     /// Trim the archive to maintain diversity
-    async fn trim_archive(
-        &self,
-        archive: &mut HashMap<String, ArchiveEntry>,
-    ) -> Result<()> {
+    async fn trim_archive(&self) -> Result<()> {
         // In a real implementation, this would use quality-diversity
         // algorithms to maintain a diverse set of high-quality solutions
-        
+
         // For now, we'll just keep the newest entries
-        let mut entries: Vec<(String, ArchiveEntry)> = archive.drain().collect();
+        let mut entries: Vec<(String, ArchiveEntry)> = self.archive.iter()
+            .map(|e| (e.key().clone(), e.value().clone()))
+            .collect();
         entries.sort_by(|a, b| b.1.added_at.cmp(&a.1.added_at));
         
         let params = self.parameters.read().await;
         entries.truncate(params.max_archive_size);
-        
+
+        self.archive.clear();
         for (key, entry) in entries {
-            archive.insert(key, entry);
+            self.archive.insert(key, entry);
         }
         
         Ok(())
@@ -527,11 +530,11 @@ impl ExplorationStrategy {
     
     /// Get statistics about the exploration archive
     pub async fn get_archive_stats(&self) -> ArchiveStats {
-        let archive = self.archive.read().await;
+        let total_entries = self.archive.len();
         let novelty_archive = self.novelty_archive.read().await;
-        
+
         ArchiveStats {
-            total_entries: archive.len(),
+            total_entries,
             novelty_entries: novelty_archive.len(),
             feature_coverage: self.calculate_feature_coverage().await,
             top_scores: self.get_top_scores(5).await,
@@ -605,5 +608,3 @@ pub struct ArchiveStats {
     pub top_scores: Vec<(Uuid, f32)>,
 }
 
-// Add missing imports
-use rand::prelude::*;

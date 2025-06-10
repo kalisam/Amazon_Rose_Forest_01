@@ -5,7 +5,9 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use anyhow::{Result, anyhow};
 use tracing::{info, error, debug, warn};
-use warp;
+
+use warp::{Filter, Reply};
+main
 
 use crate::core::metrics::MetricsCollector;
 use crate::nerv::runtime::Runtime;
@@ -138,9 +140,10 @@ impl Server {
                 }))
             });
             
+        let metrics_path = config.metrics_path.trim_start_matches('/').to_string();
         let metrics_route = if config.enable_metrics {
             let metrics_clone = metrics.clone();
-            warp::path(config.metrics_path.trim_start_matches('/'))
+            warp::path(metrics_path.clone())
                 .map(move || {
                     debug!("Metrics request received");
                     let prometheus_metrics = metrics_clone.prometheus_metrics();
@@ -149,22 +152,23 @@ impl Server {
                         "Content-Type",
                         "text/plain; version=0.0.4",
                     )
+                    .into_response()
                 })
                 .boxed()
         } else {
-            warp::any()
-                .and(warp::path(config.metrics_path.trim_start_matches('/')))
+            warp::path(metrics_path)
                 .map(|| {
                     warp::reply::with_status(
                         "Metrics endpoint disabled",
                         warp::http::StatusCode::NOT_FOUND,
                     )
+                    .into_response()
                 })
                 .boxed()
         };
         
+        let api_path = config.api_path.trim_start_matches('/').to_string();
         let api_routes = if config.enable_api {
-            let api_path = config.api_path.trim_start_matches('/').to_string();
             
             // API version endpoint
             let version_route = warp::path(api_path.clone())
@@ -173,7 +177,9 @@ impl Server {
                     warp::reply::json(&serde_json::json!({
                         "version": crate::VERSION,
                     }))
-                });
+                    .into_response()
+                })
+                .boxed();
                 
             // Statistics endpoint
             let stats_route = warp::path(api_path)
@@ -184,19 +190,19 @@ impl Server {
                         "uptime_seconds": 0, // TODO: Add actual uptime
                         "memory_usage_mb": 0, // TODO: Add actual memory usage
                     });
-                    
-                    warp::reply::json(&stats)
-                });
-                
-            version_route.or(stats_route).boxed()
+
+                    warp::reply::json(&stats).into_response()
+                })
+                .boxed();
+            version_route.or(stats_route).unify().boxed()
         } else {
-            warp::any()
-                .and(warp::path(config.api_path.trim_start_matches('/')))
+            warp::path(api_path)
                 .map(|| {
                     warp::reply::with_status(
                         "API endpoint disabled",
                         warp::http::StatusCode::NOT_FOUND,
                     )
+                    .into_response()
                 })
                 .boxed()
         };

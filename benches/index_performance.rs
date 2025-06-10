@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 fn bench_vector_index(c: &mut Criterion) {
     // Setup test vectors
-    let dimensions = 128;
+    let dimensions = 60;
     let vector_count = 10000;
     let test_vectors: Vec<Vector> = (0..vector_count)
         .map(|_| Vector::random_normal(dimensions, 0.0, 1.0))
@@ -36,7 +36,7 @@ fn bench_vector_index(c: &mut Criterion) {
                     b.iter_with_setup(
                         || {
                             // Create a new index for each iteration
-                            let index = VectorIndex::new("bench_index", dimensions, metric, None);
+                            let index = VectorIndex::new("bench_index", dimensions, metric, None).unwrap();
                             (index, test_vectors.clone())
                         },
                         |(index, vectors)| {
@@ -66,7 +66,7 @@ fn bench_vector_index(c: &mut Criterion) {
                 |b, _| {
                     // Setup the index with test vectors
                     let rt = tokio::runtime::Runtime::new().unwrap();
-                    let index = VectorIndex::new("bench_index", dimensions, metric, None);
+                    let index = VectorIndex::new("bench_index", dimensions, metric, None).unwrap();
                     
                     rt.block_on(async {
                         for vector in &test_vectors {
@@ -97,7 +97,7 @@ fn bench_vector_index(c: &mut Criterion) {
             |b, _| {
                 // Setup the index with test vectors
                 let rt = tokio::runtime::Runtime::new().unwrap();
-                let index = VectorIndex::new("bench_index", dimensions, DistanceMetric::Cosine, None);
+                let index = VectorIndex::new("bench_index", dimensions, DistanceMetric::Cosine, None).unwrap();
                 
                 rt.block_on(async {
                     for vector in &test_vectors {
