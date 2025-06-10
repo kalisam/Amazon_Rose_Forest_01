@@ -591,7 +591,7 @@ mod tests {
     async fn test_stats() {
         // Build a small index with known vectors so we can predict stats
         let dimensions = 3;
-        let index = VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None);
+        let index = VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
 
         let vectors = vec![
             Vector::new(vec![0.1, 0.2, 0.3]),
