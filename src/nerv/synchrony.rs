@@ -48,8 +48,8 @@ impl SynchronyManager {
     
     pub async fn increment_local_clock(&self) -> u64 {
         let mut state = self.state.write().await;
-        let node_id = state.node_id.clone();
-        let counter = state.clock.entry(node_id).or_insert(0);
+        let node = state.node_id.clone();
+        let counter = state.clock.entry(node).or_insert(0);
 
         *counter += 1;
         *counter
