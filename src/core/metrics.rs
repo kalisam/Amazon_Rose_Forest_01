@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -43,10 +43,10 @@ pub struct MetricTimeseries {
 
 #[derive(Debug)]
 pub struct MetricsCollector {
-    counters: RwLock<HashMap<String, AtomicU64>>,
-    gauges: RwLock<HashMap<String, Arc<AtomicU64>>>,
-    histograms: RwLock<HashMap<String, Vec<u64>>>,
-    timeseries: RwLock<HashMap<String, MetricTimeseries>>,
+    counters: DashMap<String, AtomicU64>,
+    gauges: DashMap<String, Arc<AtomicU64>>,
+    histograms: DashMap<String, Vec<u64>>,
+    timeseries: DashMap<String, MetricTimeseries>,
     last_report: RwLock<Option<Instant>>,
     report_interval: Duration,
 }
@@ -54,10 +54,10 @@ pub struct MetricsCollector {
 impl MetricsCollector {
     pub fn new() -> Self {
         Self {
-            counters: RwLock::new(HashMap::new()),
-            gauges: RwLock::new(HashMap::new()),
-            histograms: RwLock::new(HashMap::new()),
-            timeseries: RwLock::new(HashMap::new()),
+            counters: DashMap::new(),
+            gauges: DashMap::new(),
+            histograms: DashMap::new(),
+            timeseries: DashMap::new(),
             last_report: RwLock::new(None),
             report_interval: Duration::from_secs(60), // Default to 1 minute
         }
@@ -69,10 +69,8 @@ impl MetricsCollector {
     }
 
     pub async fn increment_counter(&self, name: &str, value: u64) {
-        let mut counters = self.counters.write().await;
-        counters.entry(name.to_string())
-            .or_insert_with(|| AtomicU64::new(0))
-            .fetch_add(value, Ordering::Relaxed);
+        let mut entry = self.counters.entry(name.to_string()).or_insert_with(|| AtomicU64::new(0));
+        entry.fetch_add(value, Ordering::Relaxed);
             
         debug!("Counter '{}' incremented by {}", name, value);
         
@@ -80,10 +78,8 @@ impl MetricsCollector {
     }
     
     pub async fn set_gauge(&self, name: &str, value: u64) {
-        let mut gauges = self.gauges.write().await;
-        gauges.entry(name.to_string())
-            .or_insert_with(|| Arc::new(AtomicU64::new(0)))
-            .store(value, Ordering::Relaxed);
+        let mut entry = self.gauges.entry(name.to_string()).or_insert_with(|| Arc::new(AtomicU64::new(0)));
+        entry.store(value, Ordering::Relaxed);
             
         debug!("Gauge '{}' set to {}", name, value);
         
@@ -91,10 +87,8 @@ impl MetricsCollector {
     }
     
     pub async fn record_histogram(&self, name: &str, value: u64) {
-        let mut histograms = self.histograms.write().await;
-        histograms.entry(name.to_string())
-            .or_insert_with(Vec::new)
-            .push(value);
+        let mut entry = self.histograms.entry(name.to_string()).or_insert_with(Vec::new);
+        entry.push(value);
             
         debug!("Histogram '{}' recorded value {}", name, value);
         
@@ -102,8 +96,7 @@ impl MetricsCollector {
     }
     
     async fn record_timeseries(&self, name: &str, metric_type: &str, value: f64) {
-        let mut timeseries = self.timeseries.write().await;
-        let series = timeseries.entry(name.to_string()).or_insert_with(|| MetricTimeseries {
+        let mut series = self.timeseries.entry(name.to_string()).or_insert_with(|| MetricTimeseries {
             timestamps: Vec::new(),
             values: Vec::new(),
             name: name.to_string(),
@@ -122,18 +115,15 @@ impl MetricsCollector {
     }
     
     pub async fn get_counter(&self, name: &str) -> Option<u64> {
-        let counters = self.counters.read().await;
-        counters.get(name).map(|c| c.load(Ordering::Relaxed))
+        self.counters.get(name).map(|c| c.load(Ordering::Relaxed))
     }
-    
+
     pub async fn get_gauge(&self, name: &str) -> Option<u64> {
-        let gauges = self.gauges.read().await;
-        gauges.get(name).map(|g| g.load(Ordering::Relaxed))
+        self.gauges.get(name).map(|g| g.load(Ordering::Relaxed))
     }
-    
+
     pub async fn get_histogram_stats(&self, name: &str) -> Option<HistogramStats> {
-        let histograms = self.histograms.read().await;
-        histograms.get(name).map(|values| {
+        self.histograms.get(name).map(|values| {
             let mut sorted = values.clone();
             sorted.sort_unstable();
             
@@ -170,13 +160,11 @@ impl MetricsCollector {
     }
     
     pub async fn get_timeseries(&self, name: &str) -> Option<MetricTimeseries> {
-        let timeseries = self.timeseries.read().await;
-        timeseries.get(name).cloned()
+        self.timeseries.get(name).map(|v| v.clone())
     }
     
     pub async fn get_all_timeseries(&self) -> Vec<MetricTimeseries> {
-        let timeseries = self.timeseries.read().await;
-        timeseries.values().cloned().collect()
+        self.timeseries.iter().map(|kv| kv.value().clone()).collect()
     }
     
     pub async fn report(&self) -> bool {
@@ -202,21 +190,19 @@ impl MetricsCollector {
         
         info!("Metrics Report:");
         
-        let counters = self.counters.read().await;
-        for (name, counter) in counters.iter() {
-            let value = counter.load(Ordering::Relaxed);
-            info!("Counter {}: {}", name, value);
+        for entry in self.counters.iter() {
+            let value = entry.value().load(Ordering::Relaxed);
+            info!("Counter {}: {}", entry.key(), value);
         }
         
-        let gauges = self.gauges.read().await;
-        for (name, gauge) in gauges.iter() {
-            let value = gauge.load(Ordering::Relaxed);
-            info!("Gauge {}: {}", name, value);
+        for entry in self.gauges.iter() {
+            let value = entry.value().load(Ordering::Relaxed);
+            info!("Gauge {}: {}", entry.key(), value);
         }
         
-        let histograms = self.histograms.read().await;
-        for (name, _) in histograms.iter() {
-            if let Some(stats) = self.get_histogram_stats(name).await {
+        let histogram_keys: Vec<String> = self.histograms.iter().map(|e| e.key().clone()).collect();
+        for name in histogram_keys {
+            if let Some(stats) = self.get_histogram_stats(&name).await {
                 info!("Histogram {}: count={}, min={}, max={}, mean={:.2}, median={:.2}, p95={:.2}, p99={:.2}",
                     name, stats.count, stats.min, stats.max, stats.mean, stats.median, stats.p95, stats.p99);
             }
@@ -238,25 +224,23 @@ impl MetricsCollector {
         let mut output = String::new();
         
         // Add counters
-        let counters = self.counters.read().await;
-        for (name, counter) in counters.iter() {
-            let value = counter.load(Ordering::Relaxed);
-            output.push_str(&format!("# TYPE {} counter\n", name));
-            output.push_str(&format!("{} {}\n", name, value));
+        for entry in self.counters.iter() {
+            let value = entry.value().load(Ordering::Relaxed);
+            output.push_str(&format!("# TYPE {} counter\n", entry.key()));
+            output.push_str(&format!("{} {}\n", entry.key(), value));
         }
         
         // Add gauges
-        let gauges = self.gauges.read().await;
-        for (name, gauge) in gauges.iter() {
-            let value = gauge.load(Ordering::Relaxed);
-            output.push_str(&format!("# TYPE {} gauge\n", name));
-            output.push_str(&format!("{} {}\n", name, value));
+        for entry in self.gauges.iter() {
+            let value = entry.value().load(Ordering::Relaxed);
+            output.push_str(&format!("# TYPE {} gauge\n", entry.key()));
+            output.push_str(&format!("{} {}\n", entry.key(), value));
         }
         
         // Add histograms
-        let histograms = self.histograms.read().await;
-        for (name, _) in histograms.iter() {
-            if let Some(stats) = self.get_histogram_stats(name).await {
+        let histogram_keys: Vec<String> = self.histograms.iter().map(|e| e.key().clone()).collect();
+        for name in histogram_keys {
+            if let Some(stats) = self.get_histogram_stats(&name).await {
                 output.push_str(&format!("# TYPE {}_sum gauge\n", name));
                 output.push_str(&format!("{}_sum {}\n", name, stats.sum));
                 

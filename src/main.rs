@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     let shard_id = shard_manager.create_shard("demo_shard").await?;
     
     // Create a vector index
-    let dimensions = 128;
+    let dimensions = 60;
     let index = shard_manager
         .create_vector_index(shard_id, "demo_index", dimensions, DistanceMetric::Cosine)
         .await?;
