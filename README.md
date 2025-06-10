@@ -19,6 +19,17 @@ A distributed vector database optimized for machine learning workloads with Holo
 - Community arbitration system with trinary decision logic
 - Transparent audit trails for all system decisions
 
+## Dependencies
+
+Amazon Rose Forest relies on a number of external crates. Some of the most
+important ones include:
+
+- **tokio** for asynchronous runtime support
+- **warp** for the HTTP API layer
+- **serde** and **serde_json** for serialization
+- **prometheus** for metrics collection
+- **holochain** crates when running with Holochain integration
+
 ## Project Structure
 
 ```
@@ -74,6 +85,10 @@ Amazon Rose Forest integrates with Holochain to provide:
 
 ## Development
 
+### Dependencies
+
+- `warp` 0.3 is used for the HTTP API layer.
+
 ### Building
 
 ```bash
@@ -86,6 +101,28 @@ To enable functions that interact with the Holochain conductor, compile with the
 ```bash
 cargo build --features holochain_conductor
 ```
+
+The project CAN use `std::simd` for fast vector math. This API is only
+available on the Rust nightly toolchain. Install it with:
+
+```bash
+rustup toolchain install nightly
+```
+
+and build with:
+
+```bash
+cargo +nightly build
+```
+
+When you want to run a full Holochain conductor node from this project,
+enable the `holochain_conductor` feature:
+
+```bash
+cargo +nightly build --features holochain_conductor
+```
+
+ SIMD support removed by default from the code so you can build with stable Rust.
 
 ### Running
 

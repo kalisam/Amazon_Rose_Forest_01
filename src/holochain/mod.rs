@@ -6,12 +6,16 @@ pub mod entries;
 pub mod utils;
 pub mod arbitration;
 pub mod transparency;
+pub mod hash;
+
+pub use utils::sys_time;
 
 use hdk::prelude::*;
 use uuid::Uuid;
 use crate::core::vector::Vector;
 use crate::core::centroid::Centroid;
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
 /// Entry definition for a vector in Holochain
 #[hdk_entry(id = "vector")]
@@ -31,7 +35,7 @@ impl From<Vector> for VectorEntry {
             values: vector.values.clone(),
             dimensions: vector.dimensions,
             metadata: None,
-            created_at: sys_time()?,
+            created_at: sys_time().unwrap_or(0),
         }
     }
 }
@@ -80,20 +84,15 @@ pub struct AuditTrail {
     /// Who participated in validation
     pub validators: Vec<AgentPubKey>,
     
-    /// Cryptographic proof of decision process  
-    pub decision_proof: String,
+    /// Cryptographic proof of decision process
+    #[serde(with = "serde_bytes")]
+    pub decision_proof: Vec<u8>,
     
     /// Human-readable justification
     pub justification: String,
     
-    /// Timestamp with nanosecond precision
+    /// Timestamp with microsecond precision
     pub timestamp: u64,
-}
-
-/// Get the current system time
-fn sys_time() -> ExternResult<u64> {
-    let time = sys_time_precise()?;
-    Ok(time.as_micros() as u64)
 }
 
 /// DNA properties configuration
