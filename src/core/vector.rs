@@ -36,7 +36,7 @@ impl Vector {
     }
 
     pub fn random_normal(dimensions: usize, mean: f32, std_dev: f32) -> Self {
-        use rand::distributions::{Distribution, Normal};
+        use rand_distr::{Distribution, Normal};
         let normal = Normal::new(mean as f64, std_dev as f64).unwrap();
         let mut rng = rand::thread_rng();
         let values = (0..dimensions)
@@ -46,17 +46,11 @@ impl Vector {
     }
 
     pub fn dot(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.dimensions, other.dimensions,
-            "Vectors must have the same dimensions"
-        );
 
-        // Use SIMD acceleration for vectors with dimensions divisible by 4
-        if self.dimensions % 4 == 0 {
-            self.dot_simd(other)
-        } else {
-            self.dot_scalar(other)
-        }
+        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
+        
+        self.dot_scalar(other)
+
     }
 
     fn dot_scalar(&self, other: &Vector) -> f32 {
@@ -65,30 +59,6 @@ impl Vector {
             .zip(other.values.iter())
             .map(|(a, b)| a * b)
             .sum()
-    }
-
-    fn dot_simd(&self, other: &Vector) -> f32 {
-        let chunks = self.dimensions / 4;
-        let mut sum = f32x4::splat(0.0);
-
-        for i in 0..chunks {
-            let start = i * 4;
-            let a = f32x4::from([
-                self.values[start],
-                self.values[start + 1],
-                self.values[start + 2],
-                self.values[start + 3],
-            ]);
-            let b = f32x4::from([
-                other.values[start],
-                other.values[start + 1],
-                other.values[start + 2],
-                other.values[start + 3],
-            ]);
-            sum += a * b;
-        }
-
-        sum.reduce_add()
     }
 
     pub fn magnitude(&self) -> f32 {
@@ -120,17 +90,11 @@ impl Vector {
     }
 
     pub fn euclidean_distance(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.dimensions, other.dimensions,
-            "Vectors must have the same dimensions"
-        );
 
-        // Use SIMD acceleration for vectors with dimensions divisible by 4
-        if self.dimensions % 4 == 0 {
-            self.euclidean_distance_simd(other)
-        } else {
-            self.euclidean_distance_scalar(other)
-        }
+        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
+        
+        self.euclidean_distance_scalar(other)
+
     }
 
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {
@@ -142,31 +106,6 @@ impl Vector {
             .sum();
 
         sum_squared_diff.sqrt()
-    }
-
-    fn euclidean_distance_simd(&self, other: &Vector) -> f32 {
-        let chunks = self.dimensions / 4;
-        let mut sum = f32x4::splat(0.0);
-
-        for i in 0..chunks {
-            let start = i * 4;
-            let a = f32x4::from([
-                self.values[start],
-                self.values[start + 1],
-                self.values[start + 2],
-                self.values[start + 3],
-            ]);
-            let b = f32x4::from([
-                other.values[start],
-                other.values[start + 1],
-                other.values[start + 2],
-                other.values[start + 3],
-            ]);
-            let diff = a - b;
-            sum += diff * diff;
-        }
-
-        sum.reduce_add().sqrt()
     }
 
     pub fn manhattan_distance(&self, other: &Vector) -> f32 {

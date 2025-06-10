@@ -118,12 +118,13 @@ impl ShardManager {
         
         // Create the index
         let index = VectorIndex::new(
-            name, 
-            dimensions, 
+            name,
+            dimensions,
             distance_metric,
             Some(self.metrics.clone()),
-        );
-        
+        )
+        .map_err(|e| anyhow!("Failed to create vector index: {}", e))?;
+
         let index = Arc::new(index);
         
         // Store the index
