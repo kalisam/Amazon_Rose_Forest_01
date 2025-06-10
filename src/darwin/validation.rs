@@ -8,7 +8,6 @@ use crate::core::metrics::MetricsCollector;
 use crate::darwin::self_improvement::Modification;
 
 /// Validation pipeline for testing proposed modifications
-#[derive(Debug, Clone)]
 pub struct ValidationPipeline {
     /// Metrics collector
     metrics: Arc<MetricsCollector>,
@@ -26,6 +25,14 @@ pub struct ValidationPipeline {
     validation_history: RwLock<Vec<ValidationResult>>,
 }
 
+impl std::fmt::Debug for ValidationPipeline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidationPipeline")
+            .field("thresholds", &self.thresholds)
+            .finish()
+    }
+}
+
 /// Trait for validation stages
 pub trait ValidationStage: Send + Sync {
     /// Get the name of this validation stage
@@ -36,7 +43,7 @@ pub trait ValidationStage: Send + Sync {
 }
 
 /// Dynamic validation rule
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct DynamicValidationRule {
     /// Name of this rule
     name: String,
@@ -145,8 +152,10 @@ impl ValidationPipeline {
         const MAX_HISTORY: usize = 1000;
         if history.len() > MAX_HISTORY {
             history.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            let len = history.len();
-            history.drain(0..len - MAX_HISTORY);
+
+            let excess = history.len() - MAX_HISTORY;
+            history.drain(0..excess);
+
         }
 
         Ok(all_metrics)
@@ -342,9 +351,16 @@ impl ValidationStage for SecurityValidationStage {
 }
 
 /// Multi-language validation stage that can validate code in different languages
-#[derive(Debug, Clone)]
 pub struct MultiLanguageValidationStage {
     language_handlers: HashMap<String, Box<dyn ValidationStage>>,
+}
+
+impl std::fmt::Debug for MultiLanguageValidationStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MultiLanguageValidationStage")
+            .field("languages", &self.language_handlers.keys().collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl MultiLanguageValidationStage {

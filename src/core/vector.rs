@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
+use wide::f32x4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
@@ -45,12 +46,11 @@ impl Vector {
     }
 
     pub fn dot(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.dimensions, other.dimensions,
-            "Vectors must have the same dimensions"
-        );
-
+      
+        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
+        
         self.dot_scalar(other)
+
     }
 
     fn dot_scalar(&self, other: &Vector) -> f32 {
@@ -90,12 +90,11 @@ impl Vector {
     }
 
     pub fn euclidean_distance(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.dimensions, other.dimensions,
-            "Vectors must have the same dimensions"
-        );
 
+        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
+        
         self.euclidean_distance_scalar(other)
+
     }
 
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {

@@ -101,18 +101,30 @@ impl VectorIndex {
         dimensions: usize,
         distance_metric: DistanceMetric,
         metrics: Option<Arc<MetricsCollector>>,
-    ) -> Self {
-        // Determine bits per dimension based on dimensions
-        // We want to keep the total bits under 64 (for u64 hilbert index)
-        let max_total_bits = 60; // Leave some room for safety
-        let bits_per_dimension = std::cmp::min(
-            10, // Maximum reasonable value
-            max_total_bits / dimensions,
-        );
+    ) -> Result<Self, String> {
+        let max_total_bits = 60;
+
+        if dimensions == 0 {
+            return Err("dimensions must be greater than zero".to_string());
+        }
+        if dimensions > max_total_bits {
+            return Err(format!(
+                "dimensions ({}) exceed maximum supported {}",
+                dimensions, max_total_bits
+            ));
+        }
+
+        let bits_per_dimension = std::cmp::min(10, max_total_bits / dimensions);
+        if bits_per_dimension == 0 {
+            return Err(format!(
+                "calculated bits_per_dimension is zero for {} dimensions",
+                dimensions
+            ));
+        }
 
         let hilbert_curve = HilbertCurve::new(dimensions, bits_per_dimension);
 
-        Self {
+        Ok(Self {
             name: name.to_string(),
             vectors: RwLock::new(HashMap::new()),
             hilbert_curve,
@@ -120,16 +132,15 @@ impl VectorIndex {
             dimensions,
             distance_metric,
             metrics,
-        }
+        })
     }
 
     /// Convert a vector to a Hilbert index
     fn vector_to_hilbert_index(&self, vector: &Vector) -> u64 {
         // Normalize the vector components to fit within our bit range
-        let max_value = (1 << self.hilbert_curve.bits_per_dimension) - 1;
-        let point: Vec<u64> = vector
-            .values
-            .iter()
+
+        let max_value = (1 << self.hilbert_curve.bits_per_dimension()) - 1;
+        let point: Vec<u64> = vector.values.iter()
             .map(|&v| {
                 // Map from [-1.0, 1.0] to [0, max_value]
                 // First clamp the value to ensure it's in range
@@ -291,22 +302,21 @@ impl VectorIndex {
             // If we have too few candidates, fall back to linear search
             if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
                 debug!("Falling back to linear search for index '{}'", self.name);
-                candidates = vectors
-                    .iter()
-                    .map(|(&id, entry)| (id, entry.clone()))
-                    .collect();
+
+                candidates = vectors.iter().map(|(&id, entry)| (id, entry.clone())).collect();
+
             }
         }
 
         // Calculate distances
-        let mut results: Vec<SearchResult> = candidates
-            .into_iter()
+        let mut results: Vec<SearchResult> = candidates.into_iter()
+
             .map(|(id, entry)| {
                 let score = self.distance_metric.calculate(query, &entry.vector);
                 SearchResult {
                     id,
-                    vector: entry.vector.clone(),
-                    metadata: entry.metadata.clone(),
+                    vector: entry.vector,
+                    metadata: entry.metadata,
                     score,
                 }
             })
@@ -466,8 +476,9 @@ mod tests {
     use rand::Rng;
 
     async fn create_test_index(vector_count: usize, dimensions: usize) -> VectorIndex {
-        let index = VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None);
 
+        let index = VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
+        
         // Add random vectors
         for _ in 0..vector_count {
             let vector = Vector::random(dimensions);
@@ -488,7 +499,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove() {
-        let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None);
+
+        let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None).unwrap();
 
         // Add a vector
         let vector = Vector::random(3);
@@ -544,15 +556,10 @@ mod tests {
         let query = Vector::random(dimensions);
 
         // Test each metric
-        for metric in [
-            DistanceMetric::Euclidean,
-            DistanceMetric::Cosine,
-            DistanceMetric::Manhattan,
-            DistanceMetric::Hamming,
-        ]
-        .iter()
-        {
-            let index = VectorIndex::new("test_metric", dimensions, *metric, None);
+        for metric in [DistanceMetric::Euclidean, DistanceMetric::Cosine, 
+                      DistanceMetric::Manhattan, DistanceMetric::Hamming].iter() {
+            let index = VectorIndex::new("test_metric", dimensions, *metric, None).unwrap();
+            
 
             // Add all vectors
             for v in &vectors {
@@ -575,5 +582,31 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_stats() {
+        // Build a small index with known vectors so we can predict stats
+        let dimensions = 3;
+        let index = VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None);
+
+        let vectors = vec![
+            Vector::new(vec![0.1, 0.2, 0.3]),
+            Vector::new(vec![-0.4, 0.5, -0.6]),
+            Vector::new(vec![0.7, -0.8, 0.9]),
+        ];
+
+        use std::collections::HashSet;
+        let mut buckets = HashSet::new();
+        for v in &vectors {
+            // Track expected bucket count by using the same mapping as the index
+            buckets.insert(index.vector_to_hilbert_index(v));
+            index.add(v.clone(), None).await.unwrap();
+        }
+
+        let stats = index.stats().await;
+        assert_eq!(stats.vector_count, vectors.len());
+        assert_eq!(stats.dimensions, dimensions);
+        assert_eq!(stats.bucket_count, buckets.len());
     }
 }
