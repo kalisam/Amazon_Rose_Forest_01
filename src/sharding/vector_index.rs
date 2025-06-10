@@ -284,7 +284,9 @@ impl VectorIndex {
         let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
 
         // Collect candidate vectors
+
         let mut candidates: Vec<(Uuid, VectorEntry)> = Vec::new();
+
         {
             let vectors = self.vectors.read().await;
             let hilbert_map = self.hilbert_map.read().await;
@@ -293,6 +295,7 @@ impl VectorIndex {
                 if let Some(ids) = hilbert_map.get(&index) {
                     for &id in ids {
                         if let Some(entry) = vectors.get(&id) {
+
                             candidates.push((id, entry.clone()));
                         }
                     }

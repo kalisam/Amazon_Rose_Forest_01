@@ -150,9 +150,9 @@ impl ValidationPipeline {
 
         // Trim history if it gets too large
         const MAX_HISTORY: usize = 1000;
-        if history.len() > MAX_HISTORY {
+        let len = history.len();
+        if len > MAX_HISTORY {
             history.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
             let excess = history.len() - MAX_HISTORY;
             history.drain(0..excess);
 

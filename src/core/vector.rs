@@ -51,9 +51,11 @@ impl Vector {
         
         self.dot_scalar(other)
 
+
     }
 
     fn dot_scalar(&self, other: &Vector) -> f32 {
+
         self.values
             .iter()
             .zip(other.values.iter())
@@ -95,6 +97,7 @@ impl Vector {
         
         self.euclidean_distance_scalar(other)
 
+
     }
 
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {
@@ -107,6 +110,7 @@ impl Vector {
 
         sum_squared_diff.sqrt()
     }
+
 
     pub fn manhattan_distance(&self, other: &Vector) -> f32 {
         assert_eq!(
