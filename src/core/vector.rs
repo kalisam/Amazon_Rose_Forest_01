@@ -255,7 +255,7 @@ mod tests {
 
         // Test magnitude
         let mag = v1.magnitude();
-        assert!((mag - (1.0f32 + 4.0 + 9.0).sqrt()).abs() < 1e-6);
+        assert!((mag - (1.0_f32 + 4.0_f32 + 9.0_f32).sqrt()).abs() < 1e-6);
 
         // Test normalization
         let v_norm = v1.normalize();
@@ -270,7 +270,7 @@ mod tests {
 
         // Test Euclidean distance
         let euclidean = v1.euclidean_distance(&v2);
-        assert!((euclidean - ((3.0 * 3.0 + 3.0 * 3.0 + 3.0 * 3.0) as f32).sqrt()).abs() < 1e-6);
+        assert!((euclidean - (3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32).sqrt()).abs() < 1e-6);
 
         // Test Manhattan distance
         let manhattan = v1.manhattan_distance(&v2);
@@ -282,9 +282,9 @@ mod tests {
 
         // Test cosine similarity
         let cosine = v1.cosine_similarity(&v2);
-        let expected = (1.0 * 4.0 + 2.0 * 5.0 + 3.0 * 6.0)
-            / ((1.0 * 1.0 + 2.0 * 2.0 + 3.0 * 3.0).sqrt()
-                * (4.0 * 4.0 + 5.0 * 5.0 + 6.0 * 6.0).sqrt());
+        let expected = (1.0_f32 * 4.0_f32 + 2.0_f32 * 5.0_f32 + 3.0_f32 * 6.0_f32)
+            / ((1.0_f32 * 1.0_f32 + 2.0_f32 * 2.0_f32 + 3.0_f32 * 3.0_f32).sqrt()
+                * (4.0_f32 * 4.0_f32 + 5.0_f32 * 5.0_f32 + 6.0_f32 * 6.0_f32).sqrt());
         assert!((cosine - expected).abs() < 1e-6);
     }
 
