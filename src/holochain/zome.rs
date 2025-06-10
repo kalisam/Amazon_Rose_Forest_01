@@ -191,7 +191,7 @@ fn create_audit_trail(action: &str, details: String) -> ExternResult<EntryHash> 
         action: action.to_string(),
         initiator: agent_info()?.agent_latest_pubkey,
         validators: vec![], // Would be populated during validation
-        decision_proof: "".to_string(), // Would be populated with a real merkle proof
+        decision_proof: Vec::new(), // Would be populated with a real merkle proof
         justification: details,
         timestamp: sys_time()?,
     };
