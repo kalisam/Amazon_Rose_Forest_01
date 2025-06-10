@@ -29,7 +29,7 @@ rand_distr = "0.4"
 sha2 = "0.10.7"  # Added SHA-2 cryptographic hash functions
 wide = "0.7"
 warp = "0.3"
- main
+
 
 # Holochain dependencies
 hdk = "0.1.0"

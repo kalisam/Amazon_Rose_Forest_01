@@ -46,7 +46,7 @@ impl Vector {
     }
 
     pub fn dot(&self, other: &Vector) -> f32 {
-
+      
         assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
         
         self.dot_scalar(other)
