@@ -8,6 +8,8 @@ pub mod arbitration;
 pub mod transparency;
 pub mod hash;
 
+pub use utils::sys_time;
+
 use hdk::prelude::*;
 use uuid::Uuid;
 use crate::core::vector::Vector;
@@ -33,7 +35,7 @@ impl From<Vector> for VectorEntry {
             values: vector.values.clone(),
             dimensions: vector.dimensions,
             metadata: None,
-            created_at: sys_time()?,
+            created_at: sys_time().unwrap_or(0),
         }
     }
 }
@@ -89,14 +91,8 @@ pub struct AuditTrail {
     /// Human-readable justification
     pub justification: String,
     
-    /// Timestamp with nanosecond precision
+    /// Timestamp with microsecond precision
     pub timestamp: u64,
-}
-
-/// Get the current system time
-fn sys_time() -> ExternResult<u64> {
-    let time = sys_time_precise()?;
-    Ok(time.as_micros() as u64)
 }
 
 /// DNA properties configuration

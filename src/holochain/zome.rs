@@ -2,9 +2,8 @@
 
 use hdk::prelude::*;
 use crate::core::vector::Vector;
-use crate::holochain::{VectorEntry, CentroidEntry, AuditTrail};
+use crate::holochain::{VectorEntry, CentroidEntry, AuditTrail, sys_time};
 use crate::holochain::dna::get_distance_metric;
-use crate::holochain::utils::*;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -205,10 +204,4 @@ fn create_audit_trail(action: &str, details: String) -> ExternResult<EntryHash> 
     create_link(path.path_entry_hash()?, entry_hash.clone(), link_tag)?;
     
     Ok(entry_hash)
-}
-
-/// Get the current system time
-pub fn sys_time() -> ExternResult<u64> {
-    let time = sys_time_precise()?;
-    Ok(time.as_micros() as u64)
 }
