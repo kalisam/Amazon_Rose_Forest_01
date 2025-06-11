@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
-use wide::f32x4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
@@ -46,16 +45,15 @@ impl Vector {
     }
 
     pub fn dot(&self, other: &Vector) -> f32 {
-      
-        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
-        
+        assert_eq!(
+            self.dimensions, other.dimensions,
+            "Vectors must have the same dimensions"
+        );
+
         self.dot_scalar(other)
-
-
     }
 
     fn dot_scalar(&self, other: &Vector) -> f32 {
-
         self.values
             .iter()
             .zip(other.values.iter())
@@ -92,12 +90,12 @@ impl Vector {
     }
 
     pub fn euclidean_distance(&self, other: &Vector) -> f32 {
+        assert_eq!(
+            self.dimensions, other.dimensions,
+            "Vectors must have the same dimensions"
+        );
 
-        assert_eq!(self.dimensions, other.dimensions, "Vectors must have the same dimensions");
-        
         self.euclidean_distance_scalar(other)
-
-
     }
 
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {
@@ -110,7 +108,6 @@ impl Vector {
 
         sum_squared_diff.sqrt()
     }
-
 
     pub fn manhattan_distance(&self, other: &Vector) -> f32 {
         assert_eq!(
@@ -270,7 +267,10 @@ mod tests {
 
         // Test Euclidean distance
         let euclidean = v1.euclidean_distance(&v2);
-        assert!((euclidean - (3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32).sqrt()).abs() < 1e-6);
+        assert!(
+            (euclidean - (3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32 + 3.0_f32 * 3.0_f32).sqrt()).abs()
+                < 1e-6
+        );
 
         // Test Manhattan distance
         let manhattan = v1.manhattan_distance(&v2);
