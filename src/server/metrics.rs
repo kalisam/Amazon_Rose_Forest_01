@@ -1,9 +1,7 @@
-use std::sync::LazyLock;
 use once_cell::sync::Lazy;
 use prometheus::{
-    Registry, Counter, Gauge, Histogram, HistogramOpts, 
-    CounterVec, GaugeVec, HistogramVec, Opts, register_counter_vec, 
-    register_gauge_vec, register_histogram_vec,
+    register_counter_vec, register_gauge_vec, register_histogram_vec, Counter, CounterVec, Gauge,
+    GaugeVec, Histogram, HistogramOpts, HistogramVec, Opts, Registry,
 };
 
 // Global Prometheus registry
@@ -28,7 +26,10 @@ pub static VECTOR_SEARCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
         HistogramOpts::new(
             "vector_search_duration_seconds",
             "Duration of vector search operations"
-        ).buckets(vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
+        )
+        .buckets(vec![
+            0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0
+        ]),
         &["index", "dimensions"],
         REGISTRY.clone(),
     )
@@ -37,12 +38,8 @@ pub static VECTOR_SEARCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
 
 // Shard metrics
 pub static SHARD_COUNT: Lazy<Gauge> = Lazy::new(|| {
-    prometheus::register_gauge!(
-        "shard_count",
-        "Number of active shards",
-        REGISTRY.clone(),
-    )
-    .expect("Failed to create shard count gauge")
+    prometheus::register_gauge!("shard_count", "Number of active shards", REGISTRY.clone(),)
+        .expect("Failed to create shard count gauge")
 });
 
 pub static SHARD_VECTORS: Lazy<GaugeVec> = Lazy::new(|| {
@@ -116,17 +113,24 @@ pub fn update_shard_count(count: usize) {
 
 /// Update vectors in a shard
 pub fn update_shard_vectors(shard_id: &str, count: usize) {
-    SHARD_VECTORS.with_label_values(&[shard_id]).set(count as f64);
+    SHARD_VECTORS
+        .with_label_values(&[shard_id])
+        .set(count as f64);
 }
 
 /// Update circuit breaker state
-pub fn update_circuit_breaker_state(name: &str, state: crate::network::circuit_breaker::CircuitState) {
+pub fn update_circuit_breaker_state(
+    name: &str,
+    state: crate::network::circuit_breaker::CircuitState,
+) {
     let state_value = match state {
         crate::network::circuit_breaker::CircuitState::Closed => 0.0,
         crate::network::circuit_breaker::CircuitState::Open => 1.0,
         crate::network::circuit_breaker::CircuitState::HalfOpen => 2.0,
     };
-    CIRCUIT_BREAKER_STATE.with_label_values(&[name]).set(state_value);
+    CIRCUIT_BREAKER_STATE
+        .with_label_values(&[name])
+        .set(state_value);
 }
 
 /// Record a circuit breaker failure
