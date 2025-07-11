@@ -361,8 +361,8 @@ impl ExplorationStrategy {
 
         // Generate feature descriptors for quality-diversity
         let features = self.extract_features(&modification, &metrics);
-        // Clone features so we can use them after moving into the archive entry
-        let features_clone = features.clone();
+        // Keep a copy for the archive entry before moving features elsewhere
+        let archive_features = features.clone();
 
         // Precompute fields used before moving values
         let mod_id = modification.id;
@@ -372,7 +372,7 @@ impl ExplorationStrategy {
         let entry = ArchiveEntry {
             modification,
             metrics,
-            features,
+            features: archive_features,
             added_at: chrono::Utc::now(),
         };
 
@@ -384,7 +384,7 @@ impl ExplorationStrategy {
         // Add to novelty archive
         let novelty_point = NoveltyPoint {
             id: mod_id,
-            features: features_clone,
+            features,
             score,
             added_at: chrono::Utc::now(),
         };
