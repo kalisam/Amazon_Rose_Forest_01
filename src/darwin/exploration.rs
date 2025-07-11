@@ -1,13 +1,11 @@
 use anyhow::{anyhow, Result};
+use dashmap::DashMap;
+use rand::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, warn, error, debug};
-use uuid::Uuid;
-use dashmap::DashMap;
 use tokio::sync::RwLock;
-use rand::prelude::*;
-
-
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use crate::core::metrics::MetricsCollector;
 use crate::darwin::self_improvement::Modification;
@@ -20,7 +18,7 @@ pub struct ExplorationStrategy {
 
     /// Archive of previously explored solutions
     archive: DashMap<String, ArchiveEntry>,
-    
+
     /// Current exploration parameters
     parameters: RwLock<ExplorationParameters>,
 
@@ -320,8 +318,10 @@ impl ExplorationStrategy {
     }
 
     /// Tournament selection for choosing parents
-    async fn tournament_selection(&self, archive: &DashMap<String, ArchiveEntry>) -> Option<ArchiveEntry> {
-      
+    async fn tournament_selection(
+        &self,
+        archive: &DashMap<String, ArchiveEntry>,
+    ) -> Option<ArchiveEntry> {
         let params = self.parameters.read().await;
         let mut rng = rand::thread_rng();
 
@@ -329,7 +329,6 @@ impl ExplorationStrategy {
         if archive.len() <= 1 {
             return archive.iter().next().map(|e| e.value().clone());
         }
-
 
         let entries: Vec<ArchiveEntry> = archive.iter().map(|e| e.value().clone()).collect();
 
@@ -344,14 +343,12 @@ impl ExplorationStrategy {
         }
 
         // Find the best entry in the tournament
-        tournament
-            .into_iter()
-            .max_by(|a, b| {
-                // Compare based on sum of metrics (higher is better)
-                let a_score: f32 = a.metrics.values().sum();
-                let b_score: f32 = b.metrics.values().sum();
-                a_score.partial_cmp(&b_score).unwrap()
-            })
+        tournament.into_iter().max_by(|a, b| {
+            // Compare based on sum of metrics (higher is better)
+            let a_score: f32 = a.metrics.values().sum();
+            let b_score: f32 = b.metrics.values().sum();
+            a_score.partial_cmp(&b_score).unwrap()
+        })
     }
 
     /// Add a validated modification to the archive
@@ -364,6 +361,8 @@ impl ExplorationStrategy {
 
         // Generate feature descriptors for quality-diversity
         let features = self.extract_features(&modification, &metrics);
+        // Keep a copy for the archive entry before moving features elsewhere
+        let archive_features = features.clone();
 
         // Precompute fields used before moving values
         let mod_id = modification.id;
@@ -373,7 +372,7 @@ impl ExplorationStrategy {
         let entry = ArchiveEntry {
             modification,
             metrics,
-            features,
+            features: archive_features,
             added_at: chrono::Utc::now(),
         };
 
@@ -381,7 +380,7 @@ impl ExplorationStrategy {
         let key = entry.modification.id.to_string();
 
         self.archive.insert(key, entry);
-        
+
         // Add to novelty archive
         let novelty_point = NoveltyPoint {
             id: mod_id,
@@ -389,7 +388,7 @@ impl ExplorationStrategy {
             score,
             added_at: chrono::Utc::now(),
         };
-        
+
         {
             let mut novelty_archive = self.novelty_archive.write().await;
             novelty_archive.push(novelty_point);
@@ -409,8 +408,10 @@ impl ExplorationStrategy {
         }
 
         // Update metrics
-        self.metrics.set_gauge("darwin.exploration.archive_size", self.archive.len() as u64).await;
-        
+        self.metrics
+            .set_gauge("darwin.exploration.archive_size", self.archive.len() as u64)
+            .await;
+
         Ok(())
     }
 
@@ -494,12 +495,13 @@ impl ExplorationStrategy {
 
     /// Trim the archive to maintain diversity
     async fn trim_archive(&self) -> Result<()> {
-
         // In a real implementation, this would use quality-diversity
         // algorithms to maintain a diverse set of high-quality solutions
 
         // For now, we'll just keep the newest entries
-        let mut entries: Vec<(String, ArchiveEntry)> = self.archive.iter()
+        let mut entries: Vec<(String, ArchiveEntry)> = self
+            .archive
+            .iter()
             .map(|e| (e.key().clone(), e.value().clone()))
             .collect();
         entries.sort_by(|a, b| b.1.added_at.cmp(&a.1.added_at));
@@ -635,4 +637,3 @@ pub struct ArchiveStats {
     pub feature_coverage: f32,
     pub top_scores: Vec<(Uuid, f32)>,
 }
-
