@@ -36,62 +36,62 @@ impl CentroidCRDT {
             observed: HashSet::new(),
         }
     }
-    
+
     pub fn create_centroid(&mut self, vector: Vector) -> Uuid {
         let centroid = Centroid::new(vector.clone());
         let centroid_id = centroid.id;
-        
+
         let operation = CentroidOperation {
             id: Uuid::new_v4(),
             centroid_id,
             timestamp: chrono::Utc::now(),
             operation_type: OperationType::Create(vector),
         };
-        
+
         self.apply_operation(operation.clone());
-        
+
         centroid_id
     }
-    
+
     pub fn update_centroid(&mut self, centroid_id: Uuid, vector: Vector) -> Result<(), String> {
         if !self.centroids.contains_key(&centroid_id) {
             return Err(format!("Centroid with ID {} not found", centroid_id));
         }
-        
+
         let operation = CentroidOperation {
             id: Uuid::new_v4(),
             centroid_id,
             timestamp: chrono::Utc::now(),
             operation_type: OperationType::Update(vector),
         };
-        
+
         self.apply_operation(operation.clone());
-        
+
         Ok(())
     }
-    
+
     pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), String> {
         if !self.centroids.contains_key(&centroid_id) {
             return Err(format!("Centroid with ID {} not found", centroid_id));
         }
-        
+
         let operation = CentroidOperation {
             id: Uuid::new_v4(),
             centroid_id,
             timestamp: chrono::Utc::now(),
             operation_type: OperationType::Delete,
         };
-        
+
         self.apply_operation(operation.clone());
-        
+
         Ok(())
     }
-    
+
     pub fn apply_operation(&mut self, operation: CentroidOperation) {
         if self.observed.contains(&operation.id) {
             return; // Already observed this operation
         }
-        
+
         match &operation.operation_type {
             OperationType::Create(vector) => {
                 // Only create if it doesn't exist or if this is newer than the existing centroid
@@ -100,7 +100,7 @@ impl CentroidCRDT {
                 } else {
                     true
                 };
-                
+
                 if should_create {
                     let now = chrono::Utc::now();
                     let centroid = Centroid {
@@ -129,12 +129,12 @@ impl CentroidCRDT {
                 }
             },
         }
-        
+
         let op_id = operation.id;
         self.operations.insert(op_id, operation);
         self.observed.insert(op_id);
     }
-    
+
     pub fn merge(&mut self, other: &CentroidCRDT) {
         for (op_id, operation) in &other.operations {
             if !self.observed.contains(op_id) {
@@ -142,21 +142,21 @@ impl CentroidCRDT {
             }
         }
     }
-    
+
     pub fn get_centroid(&self, id: &Uuid) -> Option<&Centroid> {
         self.centroids.get(id)
     }
-    
+
     pub fn get_centroids(&self) -> Vec<&Centroid> {
         self.centroids.values().collect()
     }
-    
+
     pub fn find_nearest(&self, vector: &Vector, limit: usize) -> Vec<(&Centroid, f32)> {
         let mut distances: Vec<(&Centroid, f32)> = self.centroids
             .values()
             .map(|c| (c, c.distance_to(vector)))
             .collect();
-            
+
         distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         distances.truncate(limit);
         distances
@@ -167,35 +167,35 @@ impl CentroidCRDT {
 mod tests {
     use super::*;
     use uuid::Uuid;
-    
+
     #[test]
     fn test_create_centroid() {
         let node_id = Uuid::new_v4();
         let mut crdt = CentroidCRDT::new(node_id);
-        
+
         let vector = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id = crdt.create_centroid(vector.clone());
-        
+
         assert_eq!(crdt.centroids.len(), 1);
         assert_eq!(crdt.operations.len(), 1);
-        
+
         let centroid = crdt.get_centroid(&centroid_id).unwrap();
         assert_eq!(centroid.vector.values, vector.values);
     }
-    
+
     #[test]
     fn test_update_centroid() {
         let node_id = Uuid::new_v4();
         let mut crdt = CentroidCRDT::new(node_id);
-        
+
         let vector1 = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id = crdt.create_centroid(vector1);
-        
+
         let vector2 = Vector::new(vec![4.0, 5.0, 6.0]);
         crdt.update_centroid(centroid_id, vector2).unwrap();
-        
+
         assert_eq!(crdt.operations.len(), 2);
-        
+
         let centroid = crdt.get_centroid(&centroid_id).unwrap();
         // After updating, the vector should be a weighted average of the original and new vector
         // With 1 existing element and 1 new element, the weights are 1/2 each
@@ -206,21 +206,21 @@ mod tests {
         assert!(centroid.vector.values[2] > 3.0 && centroid.vector.values[2] < 6.0);
         assert_eq!(centroid.count, 2);
     }
-    
+
     #[test]
     fn test_delete_centroid() {
         let node_id = Uuid::new_v4();
         let mut crdt = CentroidCRDT::new(node_id);
-        
+
         let vector = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id = crdt.create_centroid(vector.clone());
-        
+
         crdt.delete_centroid(centroid_id).unwrap();
-        
+
         assert_eq!(crdt.centroids.len(), 0);
         assert_eq!(crdt.operations.len(), 2);
     }
-    
+
     #[test]
     fn test_merge() {
         // Create two CRDTs
@@ -228,35 +228,35 @@ mod tests {
         let node_id2 = Uuid::new_v4();
         let mut crdt1 = CentroidCRDT::new(node_id1);
         let mut crdt2 = CentroidCRDT::new(node_id2);
-        
+
         // Add a centroid to the first CRDT
         let vector1 = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id1 = crdt1.create_centroid(vector1.clone());
-        
+
         // Add a different centroid to the second CRDT
         let vector2 = Vector::new(vec![4.0, 5.0, 6.0]);
         let centroid_id2 = crdt2.create_centroid(vector2.clone());
-        
+
         // Merge the second CRDT into the first
         crdt1.merge(&crdt2);
-        
+
         // First CRDT should now have both centroids
         assert_eq!(crdt1.centroids.len(), 2);
         assert!(crdt1.centroids.contains_key(&centroid_id1));
         assert!(crdt1.centroids.contains_key(&centroid_id2));
-        
+
         // Verify the centroids have the correct vectors
         let merged_centroid1 = crdt1.get_centroid(&centroid_id1).unwrap();
         let merged_centroid2 = crdt1.get_centroid(&centroid_id2).unwrap();
-        
+
         assert_eq!(merged_centroid1.vector.values, vector1.values);
         assert_eq!(merged_centroid2.vector.values, vector2.values);
-        
+
         // Operations should be merged too
         assert_eq!(crdt1.operations.len(), 2);
         assert_eq!(crdt1.observed.len(), 2);
     }
-    
+
     #[test]
     fn test_concurrent_operations() {
         // Test handling of concurrent operations with different timestamps
@@ -264,16 +264,16 @@ mod tests {
         let node_id2 = Uuid::new_v4();
         let mut crdt1 = CentroidCRDT::new(node_id1);
         let mut crdt2 = CentroidCRDT::new(node_id2);
-        
+
         // Both CRDTs create a centroid with the same ID but different vectors
         let centroid_id = Uuid::new_v4();
         let vector1 = Vector::new(vec![1.0, 2.0, 3.0]);
         let vector2 = Vector::new(vec![4.0, 5.0, 6.0]);
-        
+
         // Create the same centroid in both CRDTs with different timestamps
         let now = chrono::Utc::now();
         let later = now + chrono::Duration::seconds(10);
-        
+
         // Earlier operation in CRDT1
         let op1 = CentroidOperation {
             id: Uuid::new_v4(),
@@ -281,7 +281,7 @@ mod tests {
             timestamp: now,
             operation_type: OperationType::Create(vector1),
         };
-        
+
         // Later operation in CRDT2
         let op2 = CentroidOperation {
             id: Uuid::new_v4(),
@@ -289,13 +289,13 @@ mod tests {
             timestamp: later,
             operation_type: OperationType::Create(vector2.clone()),
         };
-        
+
         crdt1.apply_operation(op1);
         crdt2.apply_operation(op2);
-        
+
         // Merge CRDT2 into CRDT1
         crdt1.merge(&crdt2);
-        
+
         // The centroid in CRDT1 should now have the vector from CRDT2
         // because it has a later timestamp
         let centroid = crdt1.get_centroid(&centroid_id).unwrap();

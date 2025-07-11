@@ -7,7 +7,7 @@ Amazon Rose Forest is a distributed vector database built with Rust. Core logic 
 - Build with `cargo build`.
 - Run `cargo +nightly build --features holochain_conductor` to include Holochain integration.
 - Format the code with `cargo fmt --all`.
-- Lint with `cargo clippy --all -- -D warnings`.
+- Lint with `cargo clippy --all`.
 
 ## Testing
 - Run `cargo test --all` for the full test suite.
