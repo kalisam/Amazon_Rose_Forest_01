@@ -83,6 +83,11 @@ Amazon Rose Forest integrates with Holochain to provide:
 3. **Transparent Audit Trails**: Cryptographic proof of all system decisions
 4. **Agent-Centric Security**: Authentication and authorization via Holochain
 
+**Limitations:** conductor-level operations such as DNA creation, registration,
+and cell installation are not yet implemented. When compiled with the
+`holochain_conductor` feature these functions will return an error indicating
+the missing integration.
+
 ## Development
 
 ### Dependencies
