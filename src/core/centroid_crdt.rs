@@ -1,8 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::core::centroid::Centroid;
 use crate::core::vector::Vector;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CentroidOperation {
@@ -17,6 +18,15 @@ pub enum OperationType {
     Create(Vector),
     Update(Vector),
     Delete,
+}
+
+#[derive(Debug, Error)]
+pub enum CentroidCRDTError {
+    #[error("Centroid with ID {0} not found")]
+    NotFound(Uuid),
+
+    #[error("Invalid distance value encountered during comparison")]
+    InvalidDistance,
 }
 
 #[derive(Debug, Clone)]
@@ -53,9 +63,13 @@ impl CentroidCRDT {
         centroid_id
     }
 
-    pub fn update_centroid(&mut self, centroid_id: Uuid, vector: Vector) -> Result<(), String> {
+    pub fn update_centroid(
+        &mut self,
+        centroid_id: Uuid,
+        vector: Vector,
+    ) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(format!("Centroid with ID {} not found", centroid_id));
+            return Err(CentroidCRDTError::NotFound(centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -70,9 +84,9 @@ impl CentroidCRDT {
         Ok(())
     }
 
-    pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), String> {
+    pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(format!("Centroid with ID {} not found", centroid_id));
+            return Err(CentroidCRDTError::NotFound(centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -95,11 +109,12 @@ impl CentroidCRDT {
         match &operation.operation_type {
             OperationType::Create(vector) => {
                 // Only create if it doesn't exist or if this is newer than the existing centroid
-                let should_create = if let Some(existing) = self.centroids.get(&operation.centroid_id) {
-                    operation.timestamp > existing.updated_at
-                } else {
-                    true
-                };
+                let should_create =
+                    if let Some(existing) = self.centroids.get(&operation.centroid_id) {
+                        operation.timestamp > existing.updated_at
+                    } else {
+                        true
+                    };
 
                 if should_create {
                     let now = chrono::Utc::now();
@@ -112,7 +127,7 @@ impl CentroidCRDT {
                     };
                     self.centroids.insert(operation.centroid_id, centroid);
                 }
-            },
+            }
             OperationType::Update(vector) => {
                 if let Some(centroid) = self.centroids.get_mut(&operation.centroid_id) {
                     if operation.timestamp > centroid.updated_at {
@@ -120,14 +135,14 @@ impl CentroidCRDT {
                         centroid.updated_at = operation.timestamp;
                     }
                 }
-            },
+            }
             OperationType::Delete => {
                 if let Some(centroid) = self.centroids.get(&operation.centroid_id) {
                     if operation.timestamp > centroid.updated_at {
                         self.centroids.remove(&operation.centroid_id);
                     }
                 }
-            },
+            }
         }
 
         let op_id = operation.id;
@@ -151,15 +166,23 @@ impl CentroidCRDT {
         self.centroids.values().collect()
     }
 
-    pub fn find_nearest(&self, vector: &Vector, limit: usize) -> Vec<(&Centroid, f32)> {
-        let mut distances: Vec<(&Centroid, f32)> = self.centroids
+    pub fn find_nearest(
+        &self,
+        vector: &Vector,
+        limit: usize,
+    ) -> Result<Vec<(&Centroid, f32)>, CentroidCRDTError> {
+        let mut distances: Vec<(&Centroid, f32)> = self
+            .centroids
             .values()
             .map(|c| (c, c.distance_to(vector)))
             .collect();
+        if distances.iter().any(|(_, d)| !d.is_finite()) {
+            return Err(CentroidCRDTError::InvalidDistance);
+        }
 
-        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(limit);
-        distances
+        Ok(distances)
     }
 }
 
@@ -192,7 +215,8 @@ mod tests {
         let centroid_id = crdt.create_centroid(vector1);
 
         let vector2 = Vector::new(vec![4.0, 5.0, 6.0]);
-        crdt.update_centroid(centroid_id, vector2).unwrap();
+        let res = crdt.update_centroid(centroid_id, vector2);
+        assert!(res.is_ok());
 
         assert_eq!(crdt.operations.len(), 2);
 
@@ -215,7 +239,8 @@ mod tests {
         let vector = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id = crdt.create_centroid(vector.clone());
 
-        crdt.delete_centroid(centroid_id).unwrap();
+        let res = crdt.delete_centroid(centroid_id);
+        assert!(res.is_ok());
 
         assert_eq!(crdt.centroids.len(), 0);
         assert_eq!(crdt.operations.len(), 2);
