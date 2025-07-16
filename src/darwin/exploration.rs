@@ -212,8 +212,12 @@ impl ExplorationStrategy {
                 break;
             }
 
-            let parent1 = entries.choose(&mut rng).unwrap();
-            let parent2 = entries.choose(&mut rng).unwrap();
+            let parent1 = entries
+                .choose(&mut rng)
+                .ok_or_else(|| anyhow!("archive is empty"))?;
+            let parent2 = entries
+                .choose(&mut rng)
+                .ok_or_else(|| anyhow!("archive is empty"))?;
 
             let proposal = Modification {
                 id: Uuid::new_v4(),
@@ -347,7 +351,9 @@ impl ExplorationStrategy {
             // Compare based on sum of metrics (higher is better)
             let a_score: f32 = a.metrics.values().sum();
             let b_score: f32 = b.metrics.values().sum();
-            a_score.partial_cmp(&b_score).unwrap()
+            a_score
+                .partial_cmp(&b_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
@@ -394,7 +400,11 @@ impl ExplorationStrategy {
             novelty_archive.push(novelty_point);
 
             // Keep novelty archive sorted by score (descending)
-            novelty_archive.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+            novelty_archive.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Trim novelty archive if needed
             if novelty_archive.len() > params.max_archive_size {
@@ -462,7 +472,7 @@ impl ExplorationStrategy {
         }
 
         // Sort distances and take the k smallest
-        distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let avg_distance = distances.iter().take(k).sum::<f32>() / k as f32;
 
