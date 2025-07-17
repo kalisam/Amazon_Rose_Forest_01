@@ -32,6 +32,8 @@ blake3 = { version = "1", optional = true }
 serde_bytes = "0.11"
 wide = "0.7"
 warp = "0.3"
+bulletproofs = "4.0.0"
+ad4m-client = "0.10.1-release-candidate-3"
 
 # Holochain dependencies
 hdk = "0.1.0"

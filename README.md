@@ -64,6 +64,12 @@ src/
     └── errors.rs         # Error types
 ```
 
+### Additional Layers
+
+- **Intelligence**: Components for federated learning and task orchestration.
+- **Governance & Privacy**: DAO utilities and zero-knowledge proof support.
+- **Consciousness**: Interfaces to AD4M and introspective swarm behavior.
+
 ## Performance
 
 The codebase has been optimized for performance with the following features:
