@@ -78,7 +78,8 @@ impl Server {
     }
 
     /// Start the server
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
+        self.start_time = Instant::now();
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
 
