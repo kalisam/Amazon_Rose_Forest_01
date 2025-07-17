@@ -186,6 +186,16 @@ Amazon Rose Forest can be configured through a JSON configuration file. Here's a
 }
 ```
 
+### Server Options
+
+The HTTP server exposes metrics and API endpoints. The following configuration
+flags control whether these endpoints are available:
+
+- `enable_metrics` &ndash; when set to `false`, requests to the metrics path
+  return `404 Not Found` with the body `"Metrics endpoint disabled"`.
+- `enable_api` &ndash; when set to `false`, all API requests return `404 Not
+  Found` with the body `"API endpoint disabled"`.
+
 ## License
 
 MIT

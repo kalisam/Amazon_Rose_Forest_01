@@ -123,7 +123,7 @@ impl Server {
     }
 
     /// Create the server routes
-    fn routes(
+    pub fn routes(
         &self,
         metrics: Arc<MetricsCollector>,
         config: ServerConfig,
