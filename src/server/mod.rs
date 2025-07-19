@@ -81,6 +81,7 @@ impl Server {
         self.start_time = Instant::now();
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
+      
         let server = warp::serve(self.filter());
 
         info!("Starting server on {}", addr);
@@ -119,6 +120,7 @@ impl Server {
 
         Ok(())
     }
+
 
     /// Get the Warp filter for this server
     pub fn filter(
