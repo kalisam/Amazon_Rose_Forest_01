@@ -45,7 +45,7 @@ Organize and scale agents, data, and processes—adaptive, resilient, fractal.
 1. **Clone Repository**
 
 ```sh
-git clone https://github.com/your-org/amazon-rose-forest.git
+git clone https://gitclone.com/github.com/kalisam/Amazon_Rose_Forest_01.git
 ```
 
 2. **Install Prerequisites**
@@ -108,6 +108,16 @@ Check the `ROADMAP.md` for detailed milestones.
 
 **Q:** *Do I need to be an AI expert to contribute?*
 **A:** Not at all! Coders, researchers, philosophers, artists, dreamers—everyone is needed to grow this infinite, blooming forest.
+
+### Server Options
+
+The HTTP server exposes metrics and API endpoints. The following configuration
+flags control whether these endpoints are available:
+
+- `enable_metrics` &ndash; when set to `false`, requests to the metrics path
+  return `404 Not Found` with the body `"Metrics endpoint disabled"`.
+- `enable_api` &ndash; when set to `false`, all API requests return `404 Not
+  Found` with the body `"API endpoint disabled"`.
 
 ## 🌹 Together, We Bloom
 
