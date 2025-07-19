@@ -1,25 +1,13 @@
-<<<<<<< Updated upstream
-use anyhow::{anyhow, Result};
-use prometheus::{Encoder, Registry, TextEncoder};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Instant;
-use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
-use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
-
 #[rustfmt::skip]
-use warp::{Filter, Reply};
-=======
->>>>>>> Stashed changes
 use crate::core::metrics::MetricsCollector;
 use crate::nerv::runtime::Runtime;
 use crate::sharding::manager::ShardManager;
 use anyhow::{anyhow, Result};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock as StdRwLock};
+use std::time::Instant;
+use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
@@ -67,7 +55,7 @@ pub struct Server {
     runtime: Option<Arc<Runtime>>,
     shard_manager: Option<Arc<ShardManager>>,
     server_handle: RwLock<Option<JoinHandle<Result<()>>>>,
-    start_time: Instant,
+    start_time: Arc<StdRwLock<Option<Instant>>>,
 }
 
 impl Server {
@@ -84,25 +72,16 @@ impl Server {
             runtime,
             shard_manager,
             server_handle: RwLock::new(None),
-            start_time: Instant::now(),
+            start_time: Arc::new(StdRwLock::new(None)),
         }
     }
 
     /// Start the server
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
+        self.start_time = Instant::now();
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
-
-<<<<<<< Updated upstream
         let server = warp::serve(self.filter());
-=======
-        let metrics = self.metrics.clone();
-        let config = self.config.clone();
-        let runtime = self.runtime.clone();
-        let shard_manager = self.shard_manager.clone();
-
-        let server = warp::serve(self.routes(metrics, config, runtime, shard_manager));
->>>>>>> Stashed changes
 
         info!("Starting server on {}", addr);
 
@@ -141,7 +120,6 @@ impl Server {
         Ok(())
     }
 
-<<<<<<< Updated upstream
     /// Get the Warp filter for this server
     pub fn filter(
         &self,
@@ -151,20 +129,18 @@ impl Server {
             self.config.clone(),
             self.runtime.clone(),
             self.shard_manager.clone(),
-            self.start_time,
+            self.start_time.clone(),
         )
     }
 
-=======
->>>>>>> Stashed changes
     /// Create the server routes
-    fn routes(
+    pub fn routes(
         &self,
         metrics: Arc<MetricsCollector>,
         config: ServerConfig,
         runtime: Option<Arc<Runtime>>,
         shard_manager: Option<Arc<ShardManager>>,
-        start_time: Instant,
+        start_time: Arc<StdRwLock<Option<Instant>>>,
     ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         let health_route = warp::path("health").map(move || {
             debug!("Health check request received");
@@ -215,6 +191,7 @@ impl Server {
                 .boxed();
 
             // Statistics endpoint
+            let stats_start_time = start_time.clone();
             let stats_route = warp::path(api_path)
                 .and(warp::path("stats"))
                 .map(move || {
@@ -222,9 +199,14 @@ impl Server {
                     let pid = get_current_pid().unwrap();
                     sys.refresh_process(pid);
                     let mem_mb = sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0);
+                    let uptime_seconds = if let Some(start) = *stats_start_time.read().unwrap() {
+                        start.elapsed().as_secs()
+                    } else {
+                        0
+                    };
                     let stats = serde_json::json!({
                         "version": crate::VERSION,
-                        "uptime_seconds": start_time.elapsed().as_secs(),
+                        "uptime_seconds": uptime_seconds,
                         "memory_usage_mb": mem_mb,
                     });
 
