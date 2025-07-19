@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Instant;
+use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
@@ -54,6 +56,7 @@ pub struct Server {
     runtime: Option<Arc<Runtime>>,
     shard_manager: Option<Arc<ShardManager>>,
     server_handle: RwLock<Option<JoinHandle<Result<()>>>>,
+    start_time: Instant,
 }
 
 impl Server {
@@ -70,6 +73,7 @@ impl Server {
             runtime,
             shard_manager,
             server_handle: RwLock::new(None),
+            start_time: Instant::now(),
         }
     }
 
@@ -78,12 +82,7 @@ impl Server {
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
 
-        let metrics = self.metrics.clone();
-        let config = self.config.clone();
-        let runtime = self.runtime.clone();
-        let shard_manager = self.shard_manager.clone();
-
-        let server = warp::serve(self.routes(metrics, config, runtime, shard_manager));
+        let server = warp::serve(self.filter());
 
         info!("Starting server on {}", addr);
 
@@ -122,6 +121,19 @@ impl Server {
         Ok(())
     }
 
+    /// Get the Warp filter for this server
+    pub fn filter(
+        &self,
+    ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        self.routes(
+            self.metrics.clone(),
+            self.config.clone(),
+            self.runtime.clone(),
+            self.shard_manager.clone(),
+            self.start_time,
+        )
+    }
+
     /// Create the server routes
     pub fn routes(
         &self,
@@ -129,6 +141,7 @@ impl Server {
         config: ServerConfig,
         runtime: Option<Arc<Runtime>>,
         shard_manager: Option<Arc<ShardManager>>,
+        start_time: Instant,
     ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         let health_route = warp::path("health").map(move || {
             debug!("Health check request received");
@@ -182,10 +195,14 @@ impl Server {
             let stats_route = warp::path(api_path)
                 .and(warp::path("stats"))
                 .map(move || {
+                    let mut sys = System::new();
+                    let pid = get_current_pid().unwrap();
+                    sys.refresh_process(pid);
+                    let mem_mb = sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0);
                     let stats = serde_json::json!({
                         "version": crate::VERSION,
-                        "uptime_seconds": 0, // TODO: Add actual uptime
-                        "memory_usage_mb": 0, // TODO: Add actual memory usage
+                        "uptime_seconds": start_time.elapsed().as_secs(),
+                        "memory_usage_mb": mem_mb,
                     });
 
                     warp::reply::json(&stats).into_response()
