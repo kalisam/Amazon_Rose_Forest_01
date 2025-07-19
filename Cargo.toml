@@ -34,6 +34,8 @@ wide = "0.7"
 warp = "0.3"
 bulletproofs = "4.0.0"
 ad4m-client = "0.10.1-release-candidate-3"
+sysinfo = "0.28"
+
 
 # Holochain dependencies
 hdk = "0.1.0"
