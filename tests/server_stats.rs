@@ -8,7 +8,7 @@ async fn stats_returns_metrics() {
     let metrics = Arc::new(MetricsCollector::new());
     let mut config = ServerConfig::default();
     config.port = 0;
-    let mut server = Server::new(config, metrics, None, None);
+    let server = Server::new(config, metrics, None, None);
     server.start().await.unwrap();
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     let filter = server.filter();

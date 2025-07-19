@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock as StdRwLock};
 use std::time::Instant;
 use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
 use tokio::sync::RwLock;
@@ -56,7 +56,7 @@ pub struct Server {
     runtime: Option<Arc<Runtime>>,
     shard_manager: Option<Arc<ShardManager>>,
     server_handle: RwLock<Option<JoinHandle<Result<()>>>>,
-    start_time: Instant,
+    start_time: Arc<StdRwLock<Option<Instant>>>,
 }
 
 impl Server {
@@ -73,7 +73,7 @@ impl Server {
             runtime,
             shard_manager,
             server_handle: RwLock::new(None),
-            start_time: Instant::now(),
+            start_time: Arc::new(StdRwLock::new(None)),
         }
     }
 
@@ -82,6 +82,11 @@ impl Server {
         self.start_time = Instant::now();
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
+
+        {
+            let mut start = self.start_time.write().unwrap();
+            *start = Some(Instant::now());
+        }
 
         let server = warp::serve(self.filter());
 
@@ -131,7 +136,7 @@ impl Server {
             self.config.clone(),
             self.runtime.clone(),
             self.shard_manager.clone(),
-            self.start_time,
+            self.start_time.clone(),
         )
     }
 
@@ -142,7 +147,7 @@ impl Server {
         config: ServerConfig,
         runtime: Option<Arc<Runtime>>,
         shard_manager: Option<Arc<ShardManager>>,
-        start_time: Instant,
+        start_time: Arc<StdRwLock<Option<Instant>>>,
     ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         let health_route = warp::path("health").map(move || {
             debug!("Health check request received");
@@ -193,6 +198,7 @@ impl Server {
                 .boxed();
 
             // Statistics endpoint
+            let stats_start_time = start_time.clone();
             let stats_route = warp::path(api_path)
                 .and(warp::path("stats"))
                 .map(move || {
@@ -200,9 +206,14 @@ impl Server {
                     let pid = get_current_pid().unwrap();
                     sys.refresh_process(pid);
                     let mem_mb = sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0);
+                    let uptime_seconds = if let Some(start) = *stats_start_time.read().unwrap() {
+                        start.elapsed().as_secs()
+                    } else {
+                        0
+                    };
                     let stats = serde_json::json!({
                         "version": crate::VERSION,
-                        "uptime_seconds": start_time.elapsed().as_secs(),
+                        "uptime_seconds": uptime_seconds,
                         "memory_usage_mb": mem_mb,
                     });
 
