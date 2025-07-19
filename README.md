@@ -45,7 +45,7 @@ Organize and scale agents, data, and processes—adaptive, resilient, fractal.
 1. **Clone Repository**
 
 ```sh
-git clone https://github.com/kalisam/Amazon_Rose_Forest_01/amazon-rose-forest.git
+git clone https://gitclone.com/github.com/kalisam/Amazon_Rose_Forest_01.git
 ```
 
 2. **Install Prerequisites**
