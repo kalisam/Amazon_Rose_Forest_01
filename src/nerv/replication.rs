@@ -51,11 +51,15 @@ impl ReplicationManager {
         info!("Removed peer {} from replication manager", peer_id);
     }
 
+<<<<<<< Updated upstream
     pub async fn start_replication(
         self: Arc<Self>,
         shard_id: Uuid,
         target_node: &str,
     ) -> Result<Uuid> {
+=======
+    pub async fn start_replication(&self, shard_id: Uuid, target_node: &str) -> Result<Uuid> {
+>>>>>>> Stashed changes
         // Verify target node is in peers
         if !self.peers.read().await.contains(target_node) {
             return Err(anyhow!("Target node {} is not a known peer", target_node));
@@ -79,7 +83,11 @@ impl ReplicationManager {
 
         // Spawn task to handle replication
         let task_id_clone = task_id;
+<<<<<<< Updated upstream
         let self_clone = Arc::clone(&self);
+=======
+        let self_clone = Arc::new(self.clone());
+>>>>>>> Stashed changes
 
         tokio::spawn(async move {
             if let Err(e) = self_clone.execute_replication(task_id_clone).await {
@@ -159,4 +167,20 @@ impl ReplicationManager {
     }
 }
 
+<<<<<<< Updated upstream
 // Support cloning for the manager to allow sharing between threads
+=======
+// Support cloning for the manager to allow sharing between threads
+impl Clone for ReplicationManager {
+    fn clone(&self) -> Self {
+        // Note: This creates a new instance with the same node_id
+        // but empty tasks and peers. The tasks and peers are meant to be
+        // accessed through the original instance's RwLocks.
+        Self {
+            tasks: RwLock::new(HashMap::new()),
+            node_id: self.node_id.clone(),
+            peers: RwLock::new(HashSet::new()),
+        }
+    }
+}
+>>>>>>> Stashed changes

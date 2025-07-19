@@ -351,9 +351,13 @@ impl ExplorationStrategy {
             // Compare based on sum of metrics (higher is better)
             let a_score: f32 = a.metrics.values().sum();
             let b_score: f32 = b.metrics.values().sum();
+<<<<<<< Updated upstream
             a_score
                 .partial_cmp(&b_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
+=======
+            a_score.partial_cmp(&b_score).unwrap()
+>>>>>>> Stashed changes
         })
     }
 
@@ -378,7 +382,11 @@ impl ExplorationStrategy {
         let entry = ArchiveEntry {
             modification,
             metrics,
+<<<<<<< Updated upstream
             features: archive_features,
+=======
+            features: features.clone(),
+>>>>>>> Stashed changes
             added_at: chrono::Utc::now(),
         };
 
@@ -390,7 +398,7 @@ impl ExplorationStrategy {
         // Add to novelty archive
         let novelty_point = NoveltyPoint {
             id: mod_id,
-            features,
+            features: features.clone(),
             score,
             added_at: chrono::Utc::now(),
         };

@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 use anyhow::{anyhow, Result};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
@@ -10,9 +11,19 @@ use tracing::{debug, error, info, warn};
 
 #[rustfmt::skip]
 use warp::{Filter, Reply};
+=======
+>>>>>>> Stashed changes
 use crate::core::metrics::MetricsCollector;
 use crate::nerv::runtime::Runtime;
 use crate::sharding::manager::ShardManager;
+use anyhow::{anyhow, Result};
+use prometheus::{Encoder, Registry, TextEncoder};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
+use tracing::{debug, error, info, warn};
+use warp::{Filter, Reply};
 
 /// Server configuration
 #[derive(Debug, Clone)]
@@ -82,7 +93,16 @@ impl Server {
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
 
+<<<<<<< Updated upstream
         let server = warp::serve(self.filter());
+=======
+        let metrics = self.metrics.clone();
+        let config = self.config.clone();
+        let runtime = self.runtime.clone();
+        let shard_manager = self.shard_manager.clone();
+
+        let server = warp::serve(self.routes(metrics, config, runtime, shard_manager));
+>>>>>>> Stashed changes
 
         info!("Starting server on {}", addr);
 
@@ -121,6 +141,7 @@ impl Server {
         Ok(())
     }
 
+<<<<<<< Updated upstream
     /// Get the Warp filter for this server
     pub fn filter(
         &self,
@@ -134,6 +155,8 @@ impl Server {
         )
     }
 
+=======
+>>>>>>> Stashed changes
     /// Create the server routes
     fn routes(
         &self,

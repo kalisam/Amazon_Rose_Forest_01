@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationTask {
@@ -15,14 +15,9 @@ pub struct MigrationTask {
 }
 
 impl MigrationTask {
-    pub fn new(
-        id: Uuid,
-        shard_id: Uuid,
-        source_node: String,
-        target_node: String,
-    ) -> Self {
+    pub fn new(id: Uuid, shard_id: Uuid, source_node: String, target_node: String) -> Self {
         let now = chrono::Utc::now();
-        
+
         Self {
             id,
             shard_id,

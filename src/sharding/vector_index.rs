@@ -140,7 +140,9 @@ impl VectorIndex {
         // Normalize the vector components to fit within our bit range
 
         let max_value = (1 << self.hilbert_curve.bits_per_dimension()) - 1;
-        let point: Vec<u64> = vector.values.iter()
+        let point: Vec<u64> = vector
+            .values
+            .iter()
             .map(|&v| {
                 // Map from [-1.0, 1.0] to [0, max_value]
                 // First clamp the value to ensure it's in range
@@ -295,7 +297,6 @@ impl VectorIndex {
                 if let Some(ids) = hilbert_map.get(&index) {
                     for &id in ids {
                         if let Some(entry) = vectors.get(&id) {
-
                             candidates.push((id, entry.clone()));
                         }
                     }
@@ -306,14 +307,16 @@ impl VectorIndex {
             if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
                 debug!("Falling back to linear search for index '{}'", self.name);
 
-                candidates = vectors.iter().map(|(&id, entry)| (id, entry.clone())).collect();
-
+                candidates = vectors
+                    .iter()
+                    .map(|(&id, entry)| (id, entry.clone()))
+                    .collect();
             }
         }
 
         // Calculate distances
-        let mut results: Vec<SearchResult> = candidates.into_iter()
-
+        let mut results: Vec<SearchResult> = candidates
+            .into_iter()
             .map(|(id, entry)| {
                 let score = self.distance_metric.calculate(query, &entry.vector);
                 SearchResult {
@@ -479,9 +482,9 @@ mod tests {
     use rand::Rng;
 
     async fn create_test_index(vector_count: usize, dimensions: usize) -> VectorIndex {
+        let index =
+            VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
 
-        let index = VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
-        
         // Add random vectors
         for _ in 0..vector_count {
             let vector = Vector::random(dimensions);
@@ -502,7 +505,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove() {
-
         let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None).unwrap();
 
         // Add a vector
@@ -559,10 +561,15 @@ mod tests {
         let query = Vector::random(dimensions);
 
         // Test each metric
-        for metric in [DistanceMetric::Euclidean, DistanceMetric::Cosine, 
-                      DistanceMetric::Manhattan, DistanceMetric::Hamming].iter() {
+        for metric in [
+            DistanceMetric::Euclidean,
+            DistanceMetric::Cosine,
+            DistanceMetric::Manhattan,
+            DistanceMetric::Hamming,
+        ]
+        .iter()
+        {
             let index = VectorIndex::new("test_metric", dimensions, *metric, None).unwrap();
-            
 
             // Add all vectors
             for v in &vectors {
@@ -591,7 +598,8 @@ mod tests {
     async fn test_stats() {
         // Build a small index with known vectors so we can predict stats
         let dimensions = 3;
-        let index = VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
+        let index =
+            VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
 
         let vectors = vec![
             Vector::new(vec![0.1, 0.2, 0.3]),

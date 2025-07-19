@@ -1,8 +1,8 @@
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -45,20 +45,20 @@ pub struct ShardingConfig {
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         let mut file = File::open(path)
             .map_err(|e| anyhow!("Failed to open config file {}: {}", path.display(), e))?;
-            
+
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .map_err(|e| anyhow!("Failed to read config file {}: {}", path.display(), e))?;
-            
+
         let config: Config = serde_json::from_str(&contents)
             .map_err(|e| anyhow!("Failed to parse config file {}: {}", path.display(), e))?;
-            
+
         Ok(config)
     }
-    
+
     pub fn default() -> Self {
         Self {
             node: NodeConfig {

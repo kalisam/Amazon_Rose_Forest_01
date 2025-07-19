@@ -155,7 +155,6 @@ impl ValidationPipeline {
             history.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             let excess = history.len() - MAX_HISTORY;
             history.drain(0..excess);
-
         }
 
         Ok(all_metrics)
@@ -358,7 +357,10 @@ pub struct MultiLanguageValidationStage {
 impl std::fmt::Debug for MultiLanguageValidationStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MultiLanguageValidationStage")
-            .field("languages", &self.language_handlers.keys().collect::<Vec<_>>())
+            .field(
+                "languages",
+                &self.language_handlers.keys().collect::<Vec<_>>(),
+            )
             .finish()
     }
 }

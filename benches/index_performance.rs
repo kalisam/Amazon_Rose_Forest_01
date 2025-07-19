@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use amazon_rose_forest::sharding::vector_index::{VectorIndex, DistanceMetric};
 use amazon_rose_forest::core::vector::Vector;
+use amazon_rose_forest::sharding::vector_index::{DistanceMetric, VectorIndex};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
 fn bench_vector_index(c: &mut Criterion) {
@@ -10,7 +10,7 @@ fn bench_vector_index(c: &mut Criterion) {
     let test_vectors: Vec<Vector> = (0..vector_count)
         .map(|_| Vector::random_normal(dimensions, 0.0, 1.0))
         .collect();
-    
+
     // Setup query vectors
     let query_count = 5;
     let query_vectors: Vec<Vector> = (0..query_count)
@@ -24,7 +24,7 @@ fn bench_vector_index(c: &mut Criterion) {
         DistanceMetric::Manhattan,
         DistanceMetric::Hamming,
     ];
-    
+
     // Setup benchmark for index creation and insertion
     {
         let mut group = c.benchmark_group("vector_index_creation");
@@ -36,13 +36,14 @@ fn bench_vector_index(c: &mut Criterion) {
                     b.iter_with_setup(
                         || {
                             // Create a new index for each iteration
-                            let index = VectorIndex::new("bench_index", dimensions, metric, None).unwrap();
+                            let index =
+                                VectorIndex::new("bench_index", dimensions, metric, None).unwrap();
                             (index, test_vectors.clone())
                         },
                         |(index, vectors)| {
                             // Use tokio for async operations in benchmarks
                             let rt = tokio::runtime::Runtime::new().unwrap();
-                            
+
                             rt.block_on(async {
                                 for vector in vectors {
                                     let _ = index.add(vector, None).await.unwrap();
@@ -55,7 +56,7 @@ fn bench_vector_index(c: &mut Criterion) {
         }
         group.finish();
     }
-    
+
     // Setup benchmark for vector search
     {
         let mut group = c.benchmark_group("vector_index_search");
@@ -67,13 +68,13 @@ fn bench_vector_index(c: &mut Criterion) {
                     // Setup the index with test vectors
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     let index = VectorIndex::new("bench_index", dimensions, metric, None).unwrap();
-                    
+
                     rt.block_on(async {
                         for vector in &test_vectors {
                             let _ = index.add(vector.clone(), None).await.unwrap();
                         }
                     });
-                    
+
                     b.iter_with_setup(
                         || query_vectors[0].clone(), // Use first query vector for benchmarking
                         |query| {
@@ -87,7 +88,7 @@ fn bench_vector_index(c: &mut Criterion) {
         }
         group.finish();
     }
-    
+
     // Setup benchmark for batch search operations
     {
         let mut group = c.benchmark_group("vector_index_batch_search");
@@ -97,14 +98,16 @@ fn bench_vector_index(c: &mut Criterion) {
             |b, _| {
                 // Setup the index with test vectors
                 let rt = tokio::runtime::Runtime::new().unwrap();
-                let index = VectorIndex::new("bench_index", dimensions, DistanceMetric::Cosine, None).unwrap();
-                
+                let index =
+                    VectorIndex::new("bench_index", dimensions, DistanceMetric::Cosine, None)
+                        .unwrap();
+
                 rt.block_on(async {
                     for vector in &test_vectors {
                         let _ = index.add(vector.clone(), None).await.unwrap();
                     }
                 });
-                
+
                 b.iter(|| {
                     rt.block_on(async {
                         let mut results = Vec::new();
