@@ -112,9 +112,12 @@ impl RitualManager {
         let ritual = rituals
             .get_mut(&ritual_id)
             .ok_or_else(|| anyhow!("Ritual with ID {} not found", ritual_id))?;
-            
+
         // Find the stage index
-        let stage_index = ritual.stages.iter().position(|s| s.name == stage_name)
+        let stage_index = ritual
+            .stages
+            .iter()
+            .position(|s| s.name == stage_name)
             .ok_or_else(|| anyhow!("Stage {} not found in ritual {}", stage_name, ritual_id))?;
 
         // Clone dependency names so we can release the mutable borrow
@@ -122,7 +125,9 @@ impl RitualManager {
 
         // Check dependencies using an immutable borrow
         for dep_name in &depends_on {
-            let dep_stage = ritual.stages.iter()
+            let dep_stage = ritual
+                .stages
+                .iter()
                 .find(|s| &s.name == dep_name)
                 .ok_or_else(|| anyhow!("Dependency stage {} not found", dep_name))?;
 

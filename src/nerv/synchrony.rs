@@ -51,7 +51,6 @@ impl SynchronyManager {
         let node_id = state.node_id.clone();
         let counter = state.clock.entry(node_id).or_insert(0);
 
-
         *counter += 1;
         *counter
     }

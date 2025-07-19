@@ -2,13 +2,13 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CircuitState {
-    Closed,    // Normal operation, requests pass through
-    Open,      // Circuit is open, requests are blocked
-    HalfOpen,  // Testing if the service is healthy again
+    Closed,   // Normal operation, requests pass through
+    Open,     // Circuit is open, requests are blocked
+    HalfOpen, // Testing if the service is healthy again
 }
 
 impl std::fmt::Display for CircuitState {
@@ -38,11 +38,11 @@ pub struct CircuitBreakerMetrics {
 #[derive(Debug)]
 pub struct CircuitBreaker {
     name: String,
-    state: AtomicU64,  // 0 = Closed, 1 = Open, 2 = HalfOpen
+    state: AtomicU64, // 0 = Closed, 1 = Open, 2 = HalfOpen
     failure_threshold: u64,
     reset_timeout: Duration,
     request_timeout: Duration,
-    
+
     failure_count: AtomicU64,
     successful_calls: AtomicU64,
     failed_calls: AtomicU64,
@@ -63,7 +63,7 @@ impl CircuitBreaker {
     ) -> Self {
         Self {
             name: name.to_string(),
-            state: AtomicU64::new(0),  // Start in Closed state
+            state: AtomicU64::new(0), // Start in Closed state
             failure_threshold,
             reset_timeout,
             request_timeout,
@@ -78,45 +78,50 @@ impl CircuitBreaker {
             response_times: Mutex::new(Vec::new()),
         }
     }
-    
+
     pub fn get_state(&self) -> CircuitState {
         match self.state.load(Ordering::Relaxed) {
             0 => CircuitState::Closed,
             1 => CircuitState::Open,
             2 => CircuitState::HalfOpen,
-            _ => CircuitState::Closed,  // Default to closed for unknown states
+            _ => CircuitState::Closed, // Default to closed for unknown states
         }
     }
-    
+
     async fn transition_state(&self, new_state: CircuitState) {
         let current_state = self.get_state();
-        
+
         if current_state != new_state {
-            self.state.store(match new_state {
-                CircuitState::Closed => 0,
-                CircuitState::Open => 1,
-                CircuitState::HalfOpen => 2,
-            }, Ordering::Relaxed);
-            
+            self.state.store(
+                match new_state {
+                    CircuitState::Closed => 0,
+                    CircuitState::Open => 1,
+                    CircuitState::HalfOpen => 2,
+                },
+                Ordering::Relaxed,
+            );
+
             let now = chrono::Utc::now();
-            
+
             // Record the state transition
             {
                 let mut transitions = self.state_transitions.lock().await;
                 transitions.push((current_state, new_state, now));
             }
-            
+
             // Update last state change
             {
                 let mut last_change = self.last_state_change.lock().await;
                 *last_change = Some(now);
             }
-            
-            info!("Circuit '{}' transitioning from {} to {} state", 
-                  self.name, current_state, new_state);
+
+            info!(
+                "Circuit '{}' transitioning from {} to {} state",
+                self.name, current_state, new_state
+            );
         }
     }
-    
+
     pub async fn can_execute(&self) -> bool {
         match self.get_state() {
             CircuitState::Closed => true,
@@ -137,46 +142,46 @@ impl CircuitBreaker {
                     // No recorded failure, default to allowing execution
                     true
                 }
-            },
+            }
             CircuitState::HalfOpen => {
                 // In half-open state, only allow one request to test the service
                 true
-            },
+            }
         }
     }
-    
+
     pub async fn on_success(&self) {
         let now = Instant::now();
         {
             let mut last_success = self.last_success.lock().await;
             *last_success = Some(now);
         }
-        
+
         self.successful_calls.fetch_add(1, Ordering::Relaxed);
-        
+
         match self.get_state() {
             CircuitState::HalfOpen => {
                 // On success in half-open state, transition to closed
                 self.transition_state(CircuitState::Closed).await;
                 self.failure_count.store(0, Ordering::Relaxed);
-            },
+            }
             CircuitState::Closed => {
                 // In closed state, reset failure count after success
                 self.failure_count.store(0, Ordering::Relaxed);
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
-    
+
     pub async fn on_failure(&self) {
         let now = Instant::now();
         {
             let mut last_failure = self.last_failure.lock().await;
             *last_failure = Some(now);
         }
-        
+
         self.failed_calls.fetch_add(1, Ordering::Relaxed);
-        
+
         match self.get_state() {
             CircuitState::Closed => {
                 let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -184,39 +189,39 @@ impl CircuitBreaker {
                     // Transition to open
                     self.transition_state(CircuitState::Open).await;
                 }
-            },
+            }
             CircuitState::HalfOpen => {
                 // On failure in half-open state, transition back to open
                 self.transition_state(CircuitState::Open).await;
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
-    
+
     pub async fn record_response_time(&self, duration: Duration) {
         let mut times = self.response_times.lock().await;
         times.push(duration);
-        
+
         // Keep only the last 100 response times to avoid unbounded growth
         if times.len() > 100 {
             times.remove(0);
         }
     }
-    
+
     pub async fn get_metrics(&self) -> CircuitBreakerMetrics {
         let transitions = self.state_transitions.lock().await.clone();
         let last_failure = self.last_failure.lock().await;
         let last_success = self.last_success.lock().await;
         let last_state_change = self.last_state_change.lock().await;
         let response_times = self.response_times.lock().await;
-        
+
         let avg_response_time = if !response_times.is_empty() {
             let sum: u128 = response_times.iter().map(|d| d.as_millis()).sum();
             sum as f64 / response_times.len() as f64
         } else {
             0.0
         };
-        
+
         CircuitBreakerMetrics {
             successful_calls: self.successful_calls.load(Ordering::Relaxed),
             failed_calls: self.failed_calls.load(Ordering::Relaxed),
@@ -236,7 +241,7 @@ impl CircuitBreaker {
             avg_response_time_ms: avg_response_time,
         }
     }
-    
+
     pub async fn execute<F, Fut, T>(&self, operation: F) -> Result<T, String>
     where
         F: FnOnce() -> Fut,
@@ -245,31 +250,37 @@ impl CircuitBreaker {
         if !self.can_execute().await {
             return Err(format!("Circuit '{}' is open", self.name));
         }
-        
+
         // Setup timeout for the operation
         let start = Instant::now();
         let operation_future = operation();
         let timeout_future = tokio::time::sleep(self.request_timeout);
-        
+
         let result = tokio::select! {
             result = operation_future => result,
             _ = timeout_future => Err(format!("Operation timed out after {:?}", self.request_timeout)),
         };
-        
+
         let duration = start.elapsed();
         self.record_response_time(duration).await;
-        
+
         match &result {
             Ok(_) => {
-                debug!("Circuit '{}' operation succeeded in {:?}", self.name, duration);
+                debug!(
+                    "Circuit '{}' operation succeeded in {:?}",
+                    self.name, duration
+                );
                 self.on_success().await;
-            },
+            }
             Err(error) => {
-                warn!("Circuit '{}' operation failed with error: {}", self.name, error);
+                warn!(
+                    "Circuit '{}' operation failed with error: {}",
+                    self.name, error
+                );
                 self.on_failure().await;
-            },
+            }
         }
-        
+
         result
     }
 }

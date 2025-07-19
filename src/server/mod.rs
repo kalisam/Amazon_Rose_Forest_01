@@ -1,3 +1,7 @@
+#[rustfmt::skip]
+use crate::core::metrics::MetricsCollector;
+use crate::nerv::runtime::Runtime;
+use crate::sharding::manager::ShardManager;
 use anyhow::{anyhow, Result};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
@@ -7,12 +11,7 @@ use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
-
-#[rustfmt::skip]
 use warp::{Filter, Reply};
-use crate::core::metrics::MetricsCollector;
-use crate::nerv::runtime::Runtime;
-use crate::sharding::manager::ShardManager;
 
 /// Server configuration
 #[derive(Debug, Clone)]
@@ -82,12 +81,6 @@ impl Server {
         self.start_time = Instant::now();
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
-
-        {
-            let mut start = self.start_time.write().unwrap();
-            *start = Some(Instant::now());
-        }
-
         let server = warp::serve(self.filter());
 
         info!("Starting server on {}", addr);
