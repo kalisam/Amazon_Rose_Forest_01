@@ -1,9 +1,6 @@
 use crate::core::vector::Vector;
 use serde::{Deserialize, Serialize};
-<<<<<<< Updated upstream
-=======
 use std::sync::Arc;
->>>>>>> Stashed changes
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
