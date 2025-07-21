@@ -12,6 +12,7 @@ use crate::core::metrics::MetricsCollector;
 use crate::core::vector::Vector;
 use crate::evaluation::Evaluation;
 use crate::hypothesis::Hypothesis;
+use crate::holochain::semantic_crdt::OntologyGraph;
 
 /// Represents a proposed modification to the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +73,9 @@ pub struct SelfImprovementEngine {
 
     /// Evaluation engine
     evaluation: Evaluation,
+
+    /// Ontology graph
+    ontology: RwLock<OntologyGraph>,
 }
 
 impl SelfImprovementEngine {
@@ -90,6 +94,7 @@ impl SelfImprovementEngine {
             code_analysis: CodeAnalysis::new(),
             hypothesis: Hypothesis::new(),
             evaluation: Evaluation::new(),
+            ontology: RwLock::new(OntologyGraph::new(0.8)),
         }
     }
 
@@ -428,6 +433,18 @@ impl SelfImprovementEngine {
 
         info!("Generated 1 new modification proposals");
 
+        let mut ontology = self.ontology.write().await;
+        ontology.add_concept(
+            crate::holochain::semantic_crdt::Concept {
+                id: Uuid::new_v4().to_string(),
+                name: "Hypothesis".to_string(),
+                description: hypothesis,
+                embedding: vec![],
+                metadata: HashMap::new(),
+            },
+            "self",
+        );
+
         Ok(vec![id])
     }
 
@@ -488,6 +505,7 @@ impl Clone for SelfImprovementEngine {
             code_analysis: CodeAnalysis::new(),
             hypothesis: Hypothesis::new(),
             evaluation: Evaluation::new(),
+            ontology: RwLock::new(OntologyGraph::new(0.8)),
         }
     }
 }

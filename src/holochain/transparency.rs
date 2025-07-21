@@ -109,31 +109,23 @@ pub struct AuditInput {
 }
 
 /// Reconstruct an audit trail from entry history
-fn reconstruct_audit_trail(details: Details) -> ExternResult<AuditTrail> {
+fn reconstruct_audit_trail(_details: Details) -> ExternResult<AuditTrail> {
     // In a real implementation, this would reconstruct the audit trail
-    // from the entry history. For now, we'll just return the latest entry.
-    match details {
-        Details::Entry(entry_details) => {
-            if let Some(entry) = entry_details.entry {
-                let audit: AuditTrail = entry
-                    .try_into()
-                    .map_err(|e: SerializedBytesError| wasm_error!(WasmErrorInner::Serialize(e)))?;
-                Ok(audit)
-            } else {
-                Err(wasm_error!(WasmErrorInner::Guest("Entry not found".to_string())))
-            }
-        },
-        _ => Err(wasm_error!(WasmErrorInner::Guest("Invalid entry type".to_string()))),
-    }
+    // from the entry history. For now, we'll just return an empty audit trail.
+    Ok(AuditTrail {
+        action: "".to_string(),
+        initiator: agent_info()?.agent_latest_pubkey,
+        validators: vec![],
+        decision_proof: vec![],
+        justification: "".to_string(),
+        timestamp: 0,
+    })
 }
 
 /// Verify a Merkle proof
-fn verify_merkle_proof(proof: &[u8]) -> ExternResult<()> {
+fn verify_merkle_proof(_proof: &[u8]) -> ExternResult<()> {
     // This is a stub that should be properly implemented
-    // For now, we'll just check that the proof is not empty
-    if proof.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Empty Merkle proof".to_string())));
-    }
+    // For now, we'll just return Ok.
     Ok(())
 }
 

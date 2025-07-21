@@ -237,29 +237,29 @@ fn update_case_status(case: &mut ArbitrationCase) -> ExternResult<()> {
 }
 
 /// Gather input from the community about a conflict
-fn gather_community_input(input: &ConflictInput) -> ExternResult<Vec<CommunityInput>> {
+fn gather_community_input(_input: &ConflictInput) -> ExternResult<Vec<CommunityInput>> {
     // This would query for community input in a real implementation
     // For now, this is a stub
     Ok(Vec::new())
 }
 
 /// Analyze the semantic intent of content
-fn analyze_semantic_intent(input: &ConflictInput) -> ExternResult<SemanticAnalysis> {
+fn analyze_semantic_intent(_input: &ConflictInput) -> ExternResult<SemanticAnalysis> {
     // This would use an embedding model in a real implementation
     // For now, this is a stub
     Ok(SemanticAnalysis {
         intent: "neutral".to_string(),
-        confidence: 0.8,
+        confidence: 0.0,
     })
 }
 
 /// Retrieve historical context for participants
-fn retrieve_participant_history(input: &ConflictInput) -> ExternResult<ParticipantHistory> {
+fn retrieve_participant_history(_input: &ConflictInput) -> ExternResult<ParticipantHistory> {
     // This would query historical data in a real implementation
     // For now, this is a stub
     Ok(ParticipantHistory {
-        participant_count: 1,
-        average_contributions: 10,
+        participant_count: 0,
+        average_contributions: 0,
     })
 }
 
