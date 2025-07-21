@@ -20,6 +20,7 @@ pub struct Ritual {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+    pub trigger: RitualTrigger,
 }
 
 /// A stage in a ritual learning cycle
@@ -43,12 +44,37 @@ pub enum RitualStageStatus {
     Failed,
 }
 
+#[derive(Debug, Clone)]
+pub enum RitualTrigger {
+    Manual,
+    Scheduled(String),
+    OnEvent(String),
+}
+
 /// Manager for ritual-based learning cycles
 #[derive(Debug)]
 pub struct RitualManager {
     metrics: Arc<MetricsCollector>,
     rituals: RwLock<HashMap<Uuid, Ritual>>,
     active_rituals: RwLock<HashSet<Uuid>>,
+    scheduler: RitualScheduler,
+}
+
+#[derive(Debug)]
+pub struct RitualScheduler {
+    schedules: RwLock<HashMap<String, String>>,
+}
+
+impl RitualScheduler {
+    pub fn new() -> Self {
+        Self {
+            schedules: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub async fn add_schedule(&self, name: &str, cron: &str) {
+        self.schedules.write().await.insert(name.to_string(), cron.to_string());
+    }
 }
 
 impl RitualManager {
@@ -57,6 +83,7 @@ impl RitualManager {
             metrics,
             rituals: RwLock::new(HashMap::new()),
             active_rituals: RwLock::new(HashSet::new()),
+            scheduler: RitualScheduler::new(),
         }
     }
 
@@ -66,6 +93,7 @@ impl RitualManager {
         name: &str,
         description: &str,
         stages: Vec<RitualStage>,
+        trigger: RitualTrigger,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
         let now = Utc::now();
@@ -79,6 +107,7 @@ impl RitualManager {
             created_at: now,
             updated_at: now,
             completed_at: None,
+            trigger,
         };
 
         // Store the ritual

@@ -319,8 +319,8 @@ impl SelfImprovementEngine {
         // Note: In a real system, this would involve more sophisticated code manipulation
         // and potentially a restart of affected components
         for change in &modification.code_changes {
-            info!("Would apply change to file: {}", change.file_path);
-            // In a real system: apply_code_change(&change)?;
+            info!("Applying change to file: {}", change.file_path);
+            std::fs::write(&change.file_path, &change.modified_content)?;
         }
 
         // Update metrics

@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::core::metrics::MetricsCollector;
 use crate::darwin::self_improvement::{CodeChange, Modification, ModificationStatus};
+use crate::llm;
 
 /// Language support for polyglot coding capabilities
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -229,10 +230,7 @@ impl CodingAgent {
             // to generate code improvements with variations. For now, create placeholders.
 
             // Generate improved code (placeholder)
-            let modified_content = format!(
-                "{}\n// Optimized by Darwin Gödel Machine (candidate {})",
-                original_content, i
-            );
+            let modified_content = llm::generate_code(&original_content);
 
             // Generate diff (placeholder)
             let diff = format!("--- {}\n+++ {}\n@@ -1,1 +1,2 @@\n {}\n+// Optimized by Darwin Gödel Machine (candidate {})", 
@@ -329,7 +327,7 @@ impl CodingAgent {
         // to refine code based on feedback. For now, we'll create a placeholder.
 
         // Apply feedback (placeholder)
-        let refined_code = format!("{}\n// Refined based on feedback: {}", code, feedback);
+        let refined_code = llm::generate_code(&code);
 
         // Update metrics
         self.metrics
@@ -421,10 +419,7 @@ impl CodingAgent {
 
         for i in 0..count {
             // Generate solution (placeholder)
-            let modified_content = format!(
-                "{}\n// Solution candidate {} for problem: {}",
-                original_content, i, problem_description
-            );
+            let modified_content = llm::generate_code(&original_content);
 
             let diff = format!(
                 "--- {}\n+++ {}\n@@ -1,1 +1,2 @@\n {}\n+// Solution candidate {} for problem: {}",
@@ -454,13 +449,7 @@ impl CodingAgent {
         // to translate code concepts between languages
 
         // Simple placeholder
-        let translated_code = format!(
-            "// Translated from {} to {}\n// Concept: {}\n\n{}",
-            source_language.as_str(),
-            target_language.as_str(),
-            concept,
-            code
-        );
+        let translated_code = llm::generate_code(code);
 
         // Update metrics
         self.metrics
