@@ -14,6 +14,7 @@ pub mod hypothesis;
 pub mod evaluation;
 pub mod ad4m;
 
+
 // Export common types for easier access
 pub use crate::consciousness::ad4m_bridge::Ad4mBridge;
 pub use crate::consciousness::introspection::Introspection;
