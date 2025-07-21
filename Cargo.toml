@@ -17,7 +17,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 futures = "0.3"
 dashmap = "5.4.0"
-rand = "0.8"
 bytes = "1.4"
 uuid = { version = "1.3", features = ["v4", "serde"] }
 async-trait = "0.1"
@@ -32,6 +31,7 @@ blake3 = { version = "1", optional = true }
 rand = "0.8"
 serde_bytes = "0.11"
 wide = "0.7"
+reqwest = { version = "0.11", features = ["json", "multipart", "tokio-support"] }
 warp = "0.3"
 bulletproofs = "4.0.0"
 ad4m-client = "0.10.1-release-candidate-3"

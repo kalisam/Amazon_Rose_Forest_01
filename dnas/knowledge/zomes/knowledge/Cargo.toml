@@ -1,0 +1,13 @@
+[package]
+name = "knowledge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.1.0"
+serde = "1.0"
+hnsw = "0.10.0"
+petgraph = "0.6.3"
