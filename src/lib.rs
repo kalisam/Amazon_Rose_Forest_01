@@ -9,6 +9,11 @@ pub mod server;
 pub mod sharding;
 pub mod utils;
 pub mod llm;
+pub mod code_analysis;
+pub mod hypothesis;
+pub mod evaluation;
+pub mod ad4m;
+
 
 // Export common types for easier access
 pub use crate::consciousness::ad4m_bridge::Ad4mBridge;

@@ -46,65 +46,20 @@ pub fn get_distance_metric() -> ExternResult<DistanceMetric> {
 }
 
 /// Create a new DNA template for a vector index
-#[cfg(feature = "holochain_conductor")]
-pub fn create_vector_index_dna(
-    name: String,
-    dimensions: usize,
-    distance_metric: DistanceMetric,
-) -> ExternResult<DnaFile> {
-    // This would be implemented at conductor level in a real implementation.
-    // Until conductor integration exists, return an explanatory error so the
-    // caller knows why the operation failed.
-    let _ = (dimensions, distance_metric);
-    Err(wasm_error!(WasmErrorInner::Guest(format!(
-        "create_vector_index_dna `{}` requires conductor integration",
-        name
-    ))))
-}
-
-#[cfg(not(feature = "holochain_conductor"))]
 pub fn create_vector_index_dna(
     _name: String,
     _dimensions: usize,
     _distance_metric: DistanceMetric,
 ) -> ExternResult<DnaFile> {
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "holochain_conductor feature disabled".into()
-    )))
+    panic!("This function should be provided by the Holochain conductor");
 }
 
 /// Register DNA with the conductor
-#[cfg(feature = "holochain_conductor")]
-pub fn register_dna(dna: DnaFile) -> ExternResult<DnaHash> {
-    // This would be implemented at conductor level in a real implementation.
-    // Return an explanatory error until integration is available.
-    let _ = dna;
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "register_dna requires conductor integration".into()
-    )))
-}
-
-#[cfg(not(feature = "holochain_conductor"))]
 pub fn register_dna(_dna: DnaFile) -> ExternResult<DnaHash> {
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "holochain_conductor feature disabled".into()
-    )))
+    panic!("This function should be provided by the Holochain conductor");
 }
 
 /// Create a cell from a DNA and install it
-#[cfg(feature = "holochain_conductor")]
-pub fn create_and_install_cell(dna_hash: DnaHash) -> ExternResult<AgentPubKey> {
-    // This would be implemented at conductor level in a real implementation.
-    // Until conductor integration exists, provide a clear error message.
-    let _ = dna_hash;
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "create_and_install_cell requires conductor integration".into()
-    )))
-}
-
-#[cfg(not(feature = "holochain_conductor"))]
 pub fn create_and_install_cell(_dna_hash: DnaHash) -> ExternResult<AgentPubKey> {
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "holochain_conductor feature disabled".into()
-    )))
+    panic!("This function should be provided by the Holochain conductor");
 }

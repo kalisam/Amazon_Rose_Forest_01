@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: value_flow
+integrity:
+  network_seeding:
+    strategy: "full"
+  zomes:
+    - name: value_flow
+      bundler:
+        type: "wasm"
+        path: "../zomes/value_flow/target/wasm32-unknown-unknown/release/value_flow.wasm"
+coordinator:
+  zomes:
+    - name: value_flow
+      integrity_zome: value_flow
+      dependencies: []

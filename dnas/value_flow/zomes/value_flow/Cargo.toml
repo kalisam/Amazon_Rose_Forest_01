@@ -1,0 +1,15 @@
+[package]
+name = "value_flow"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.1.0"
+serde = "1.0"
+ad4m-client = "0.10.1-release-candidate-3"
+anyhow = "1.0"
+tokio = { version = "1.28.0", features = ["full"] }
+serde_json = "1.0"

@@ -7,6 +7,7 @@ pub mod utils;
 pub mod arbitration;
 pub mod transparency;
 pub mod hash;
+pub mod value_flow;
 
 pub use utils::sys_time;
 
