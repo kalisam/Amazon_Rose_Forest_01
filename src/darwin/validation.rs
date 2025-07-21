@@ -299,10 +299,14 @@ impl ValidationStage for UnitTestStage {
 
     fn validate(&self, _modification: &Modification) -> Result<HashMap<String, f32>> {
         // In a real implementation, this would run actual unit tests
-        // For now, we'll simulate test results
+        let output = std::process::Command::new("cargo")
+            .arg("test")
+            .output()?;
+
         let mut metrics = HashMap::new();
-        metrics.insert("pass_rate".to_string(), 0.95);
-        metrics.insert("coverage".to_string(), 0.85);
+        metrics.insert("pass_rate".to_string(), if output.status.success() { 1.0 } else { 0.0 });
+        // In a real implementation, we would parse the output to get coverage
+        metrics.insert("coverage".to_string(), 0.0);
 
         Ok(metrics)
     }
@@ -319,11 +323,16 @@ impl ValidationStage for PerformanceBenchmarkStage {
 
     fn validate(&self, _modification: &Modification) -> Result<HashMap<String, f32>> {
         // In a real implementation, this would run performance benchmarks
-        // For now, we'll simulate benchmark results
+        let output = std::process::Command::new("cargo")
+            .arg("bench")
+            .arg("--no-run")
+            .output()?;
+
         let mut metrics = HashMap::new();
-        metrics.insert("vector_search_latency_ms".to_string(), 8.5);
-        metrics.insert("crdt_merge_latency_ms".to_string(), 0.8);
-        metrics.insert("throughput_qps".to_string(), 12000.0);
+        // In a real implementation, we would parse the output of the benchmark
+        metrics.insert("vector_search_latency_ms".to_string(), 0.0);
+        metrics.insert("crdt_merge_latency_ms".to_string(), 0.0);
+        metrics.insert("throughput_qps".to_string(), 0.0);
 
         Ok(metrics)
     }
@@ -340,10 +349,14 @@ impl ValidationStage for SecurityValidationStage {
 
     fn validate(&self, _modification: &Modification) -> Result<HashMap<String, f32>> {
         // In a real implementation, this would run security checks
-        // For now, we'll simulate security validation results
+        let output = std::process::Command::new("cargo")
+            .arg("audit")
+            .output()?;
+
         let mut metrics = HashMap::new();
-        metrics.insert("vulnerability_score".to_string(), 0.1); // Lower is better
-        metrics.insert("compliance_score".to_string(), 0.98);
+        // In a real implementation, we would parse the output of cargo audit
+        metrics.insert("vulnerability_score".to_string(), if output.status.success() { 0.0 } else { 1.0 }); // Lower is better
+        metrics.insert("compliance_score".to_string(), 0.0);
 
         Ok(metrics)
     }

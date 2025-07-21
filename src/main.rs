@@ -205,11 +205,13 @@ async fn main() -> anyhow::Result<()> {
         ];
 
         // Create ritual
+        use amazon_rose_forest::darwin::ritual::RitualTrigger;
         match ritual_manager_clone
             .create_ritual(
                 "Initial Self-Improvement Cycle",
                 "First cycle of self-improvement for the system",
                 stages,
+                RitualTrigger::Manual,
             )
             .await
         {

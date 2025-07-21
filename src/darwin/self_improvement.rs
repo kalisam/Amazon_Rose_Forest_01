@@ -7,8 +7,11 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::code_analysis::CodeAnalysis;
 use crate::core::metrics::MetricsCollector;
 use crate::core::vector::Vector;
+use crate::evaluation::Evaluation;
+use crate::hypothesis::Hypothesis;
 
 /// Represents a proposed modification to the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,6 +63,15 @@ pub struct SelfImprovementEngine {
 
     /// Solution candidates for multi-candidate validation
     solution_candidates: DashMap<Uuid, Vec<Modification>>,
+
+    /// Code analysis engine
+    code_analysis: CodeAnalysis,
+
+    /// Hypothesis engine
+    hypothesis: Hypothesis,
+
+    /// Evaluation engine
+    evaluation: Evaluation,
 }
 
 impl SelfImprovementEngine {
@@ -75,6 +87,9 @@ impl SelfImprovementEngine {
             exploration_strategy,
             max_history_size: 1000,
             solution_candidates: DashMap::new(),
+            code_analysis: CodeAnalysis::new(),
+            hypothesis: Hypothesis::new(),
+            evaluation: Evaluation::new(),
         }
     }
 
@@ -262,6 +277,15 @@ impl SelfImprovementEngine {
                 self.update_modification_status(modification_id, new_status)
                     .await?;
 
+                if passed {
+                    let before_metrics = modification.validation_metrics.clone();
+                    let improved = self.evaluation.evaluate(&before_metrics, &metrics);
+                    info!(
+                        "Modification {} was an improvement: {}",
+                        modification_id, improved
+                    );
+                }
+
                 // Update metrics
                 if passed {
                     self.metrics
@@ -319,8 +343,8 @@ impl SelfImprovementEngine {
         // Note: In a real system, this would involve more sophisticated code manipulation
         // and potentially a restart of affected components
         for change in &modification.code_changes {
-            info!("Would apply change to file: {}", change.file_path);
-            // In a real system: apply_code_change(&change)?;
+            info!("Applying change to file: {}", change.file_path);
+            std::fs::write(&change.file_path, &change.modified_content)?;
         }
 
         // Update metrics
@@ -387,18 +411,24 @@ impl SelfImprovementEngine {
         info!("Generating new modifications using exploration strategy");
 
         // Use exploration strategy to generate modifications
-        let proposals = self.exploration_strategy.generate_proposals().await?;
+        let analysis = self.code_analysis.analyze("");
+        let hypothesis = self.hypothesis.generate(&analysis);
 
-        // Submit all proposals
-        let mut ids = Vec::new();
-        for proposal in proposals {
-            let id = self.propose_modification(proposal).await?;
-            ids.push(id);
-        }
+        let proposal = Modification {
+            id: Uuid::new_v4(),
+            name: "Hypothesis-driven optimization".to_string(),
+            description: hypothesis,
+            code_changes: Vec::new(), // Would contain actual code changes
+            validation_metrics: HashMap::new(),
+            created_at: chrono::Utc::now(),
+            status: ModificationStatus::Proposed,
+        };
 
-        info!("Generated {} new modification proposals", ids.len());
+        let id = self.propose_modification(proposal).await?;
 
-        Ok(ids)
+        info!("Generated 1 new modification proposals");
+
+        Ok(vec![id])
     }
 
     /// Generate related modification from an existing one
@@ -455,6 +485,9 @@ impl Clone for SelfImprovementEngine {
             exploration_strategy: self.exploration_strategy.clone(),
             max_history_size: self.max_history_size,
             solution_candidates: DashMap::new(),
+            code_analysis: CodeAnalysis::new(),
+            hypothesis: Hypothesis::new(),
+            evaluation: Evaluation::new(),
         }
     }
 }
