@@ -300,6 +300,7 @@ impl Clone for RitualManager {
             metrics: self.metrics.clone(),
             rituals: RwLock::new(HashMap::new()),
             active_rituals: RwLock::new(HashSet::new()),
+            scheduler: RitualScheduler::new(),
         }
     }
 }

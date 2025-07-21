@@ -3,7 +3,6 @@
 use std::collections::{HashMap, HashSet};
 use petgraph::graph::DiGraph;
 use serde::{Serialize, Deserialize};
-use hdk::prelude::*;
 
 /// Semantic ontology graph with CRDT properties
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -241,32 +240,4 @@ pub fn semantic_merge(a: OntologyGraph, b: OntologyGraph) -> OntologyGraph {
     let mut merged = a.clone();
     merged.merge(&b);
     merged
-}
-
-/// Entry definition for ontology graph
-#[hdk_entry(id = "ontology_graph")]
-#[derive(Clone)]
-pub struct OntologyGraphEntry {
-    pub graph_id: String,
-    pub concepts_count: usize,
-    pub relationships_count: usize,
-    pub version: String,
-    pub created_at: u64,
-    pub updated_at: u64,
-}
-
-/// Create a new ontology graph in the DHT
-#[hdk_extern]
-pub fn create_ontology_graph(_input: CreateOntologyInput) -> ExternResult<String> {
-    // In a real implementation, this would create an ontology graph.
-    // For now, we'll just return an empty string.
-    Ok("".to_string())
-}
-
-/// Input for creating an ontology graph
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateOntologyInput {
-    pub name: String,
-    pub description: String,
-    pub similarity_threshold: f32,
 }

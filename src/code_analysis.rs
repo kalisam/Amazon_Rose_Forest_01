@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct CodeAnalysis {
     // In a real implementation, this would hold the state for the code analysis engine.
 }

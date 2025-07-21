@@ -12,7 +12,7 @@ use crate::core::metrics::MetricsCollector;
 use crate::core::vector::Vector;
 use crate::evaluation::Evaluation;
 use crate::hypothesis::Hypothesis;
-use crate::holochain::semantic_crdt::OntologyGraph;
+use crate::semantic_crdt::OntologyGraph;
 
 /// Represents a proposed modification to the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -435,10 +435,10 @@ impl SelfImprovementEngine {
 
         let mut ontology = self.ontology.write().await;
         ontology.add_concept(
-            crate::holochain::semantic_crdt::Concept {
+            crate::semantic_crdt::Concept {
                 id: Uuid::new_v4().to_string(),
                 name: "Hypothesis".to_string(),
-                description: hypothesis,
+                description: hypothesis.clone(),
                 embedding: vec![],
                 metadata: HashMap::new(),
             },

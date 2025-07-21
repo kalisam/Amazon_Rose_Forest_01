@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Hypothesis {
     // In a real implementation, this would hold the state for the hypothesis engine.
 }
