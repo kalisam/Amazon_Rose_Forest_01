@@ -1,0 +1,6 @@
+{
+  "name": "value_flow",
+  "description": "A zome for managing value flows and reputation.",
+  "entries": [],
+  "zome_functions": {}
+}
