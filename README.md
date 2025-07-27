@@ -122,3 +122,7 @@ flags control whether these endpoints are available:
 ## 🌹 Together, We Bloom
 
 > *“We are not joining a project—we are planting our unique roses in an endless garden.”*
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
