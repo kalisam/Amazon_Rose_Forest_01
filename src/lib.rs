@@ -1,19 +1,18 @@
+pub mod ad4m;
+pub mod code_analysis;
 pub mod consciousness;
 pub mod core;
 pub mod darwin;
+pub mod evaluation;
 pub mod governance;
+pub mod hypothesis;
 pub mod intelligence;
+pub mod llm;
 pub mod nerv;
 pub mod network;
 pub mod server;
 pub mod sharding;
 pub mod utils;
-pub mod llm;
-pub mod code_analysis;
-pub mod hypothesis;
-pub mod evaluation;
-pub mod ad4m;
-
 
 // Export common types for easier access
 pub use crate::consciousness::ad4m_bridge::Ad4mBridge;
@@ -21,6 +20,7 @@ pub use crate::consciousness::introspection::Introspection;
 pub use crate::consciousness::swarm::Swarm;
 pub use crate::core::centroid::Centroid;
 pub use crate::core::centroid_crdt::CentroidCRDT;
+pub use crate::core::hierarchical::{cluster_vectors, Cluster};
 pub use crate::core::vector::Vector;
 pub use crate::darwin::self_improvement::SelfImprovementEngine;
 pub use crate::governance::dao::Dao;
