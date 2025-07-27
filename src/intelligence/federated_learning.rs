@@ -96,3 +96,43 @@ impl Clone for Model {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_train_client_updates_toward_global() {
+        let dimensions = 3;
+        let mu = 0.5;
+
+        let mut fl = FederatedLearning::new(dimensions, mu);
+        fl.global_model.weights = vec![2.0, 2.0, 2.0];
+
+        let mut client = Client::new("c1", dimensions, Vec::new());
+        client.model.weights = vec![0.0, 0.0, 0.0];
+
+        let updated = fl.train_client(&mut client);
+
+        assert_eq!(updated.weights, vec![1.0, 1.0, 1.0]);
+        // Ensure client weights are unchanged
+        assert_eq!(client.model.weights, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_aggregate_averages_updates() {
+        let dimensions = 2;
+        let mu = 0.0;
+
+        let mut fl = FederatedLearning::new(dimensions, mu);
+
+        let updates = vec![
+            Model { weights: vec![1.0, 3.0] },
+            Model { weights: vec![3.0, 1.0] },
+        ];
+
+        fl.aggregate(updates);
+
+        assert_eq!(fl.global_model.weights, vec![2.0, 2.0]);
+    }
+}
