@@ -467,3 +467,22 @@ impl ShardManager {
         Ok(distribution)
     }
 }
+
+// Support cloning for the manager to allow sharing between threads
+impl Clone for ShardManager {
+    fn clone(&self) -> Self {
+        // Note: This creates a new instance with the same node_id and metrics
+        // but empty collections. The collections are meant to be
+        // accessed through the original instance's RwLocks.
+        Self {
+            metrics: self.metrics.clone(),
+            node_id: self.node_id.clone(),
+            shards: RwLock::new(HashMap::new()),
+            shard_assignments: RwLock::new(HashMap::new()),
+            migrations: RwLock::new(HashMap::new()),
+            indices: RwLock::new(HashMap::new()),
+            shard_loads: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
