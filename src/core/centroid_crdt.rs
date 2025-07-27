@@ -2,10 +2,7 @@ use crate::core::centroid::Centroid;
 use crate::core::vector::Vector;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-<<<<<<< Updated upstream
 use thiserror::Error;
-=======
->>>>>>> Stashed changes
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,15 +63,11 @@ impl CentroidCRDT {
         centroid_id
     }
 
-<<<<<<< Updated upstream
     pub fn update_centroid(
         &mut self,
         centroid_id: Uuid,
         vector: Vector,
     ) -> Result<(), CentroidCRDTError> {
-=======
-    pub fn update_centroid(&mut self, centroid_id: Uuid, vector: Vector) -> Result<(), String> {
->>>>>>> Stashed changes
         if !self.centroids.contains_key(&centroid_id) {
             return Err(CentroidCRDTError::NotFound(centroid_id));
         }
@@ -91,11 +84,7 @@ impl CentroidCRDT {
         Ok(())
     }
 
-<<<<<<< Updated upstream
     pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), CentroidCRDTError> {
-=======
-    pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), String> {
->>>>>>> Stashed changes
         if !self.centroids.contains_key(&centroid_id) {
             return Err(CentroidCRDTError::NotFound(centroid_id));
         }
@@ -177,30 +166,21 @@ impl CentroidCRDT {
         self.centroids.values().collect()
     }
 
-<<<<<<< Updated upstream
     pub fn find_nearest(
         &self,
         vector: &Vector,
         limit: usize,
     ) -> Result<Vec<(&Centroid, f32)>, CentroidCRDTError> {
-=======
-    pub fn find_nearest(&self, vector: &Vector, limit: usize) -> Vec<(&Centroid, f32)> {
->>>>>>> Stashed changes
         let mut distances: Vec<(&Centroid, f32)> = self
             .centroids
             .values()
             .map(|c| (c, c.distance_to(vector)))
             .collect();
-<<<<<<< Updated upstream
         if distances.iter().any(|(_, d)| !d.is_finite()) {
             return Err(CentroidCRDTError::InvalidDistance);
         }
 
         distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-=======
-
-        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
->>>>>>> Stashed changes
         distances.truncate(limit);
         Ok(distances)
     }
@@ -235,12 +215,8 @@ mod tests {
         let centroid_id = crdt.create_centroid(vector1);
 
         let vector2 = Vector::new(vec![4.0, 5.0, 6.0]);
-<<<<<<< Updated upstream
         let res = crdt.update_centroid(centroid_id, vector2);
         assert!(res.is_ok());
-=======
-        crdt.update_centroid(centroid_id, vector2).unwrap();
->>>>>>> Stashed changes
 
         assert_eq!(crdt.operations.len(), 2);
 
@@ -263,12 +239,8 @@ mod tests {
         let vector = Vector::new(vec![1.0, 2.0, 3.0]);
         let centroid_id = crdt.create_centroid(vector.clone());
 
-<<<<<<< Updated upstream
         let res = crdt.delete_centroid(centroid_id);
         assert!(res.is_ok());
-=======
-        crdt.delete_centroid(centroid_id).unwrap();
->>>>>>> Stashed changes
 
         assert_eq!(crdt.centroids.len(), 0);
         assert_eq!(crdt.operations.len(), 2);
