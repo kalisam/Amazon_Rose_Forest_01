@@ -73,4 +73,9 @@ impl Runtime {
     pub fn shard_manager(&self) -> Option<Arc<ShardManager>> {
         self.shard_manager.clone()
     }
+
+    /// Expose the shutdown sender for testing and external monitoring
+    pub fn shutdown_sender(&self) -> Option<mpsc::Sender<()>> {
+        self.shutdown_tx.clone()
+    }
 }
