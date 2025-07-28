@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: knowledge
+integrity:
+  network_seeding:
+    strategy: "full"
+  zomes:
+    - name: knowledge
+      bundler:
+        type: "wasm"
+        path: "../zomes/knowledge/target/wasm32-unknown-unknown/release/knowledge.wasm"
+coordinator:
+  zomes:
+    - name: knowledge
+      integrity_zome: knowledge
+      dependencies: []

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Evaluation {
     // In a real implementation, this would hold the state for the evaluation engine.
 }
