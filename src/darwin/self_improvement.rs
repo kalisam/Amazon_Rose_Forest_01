@@ -431,7 +431,7 @@ impl SelfImprovementEngine {
 
         let id = self.propose_modification(proposal).await?;
 
-        info!("Generated 1 new modification proposals");
+        info!("Generated {} new modification proposals", id.len());
 
         let mut ontology = self.ontology.write().await;
         ontology.add_concept(

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+/// Code analysis engine for evaluating and improving code quality
 #[derive(Debug)]
 pub struct CodeAnalysis {
     // In a real implementation, this would hold the state for the code analysis engine.

@@ -243,7 +243,11 @@ impl ShardManager {
         Ok(())
     }
 
-    pub async fn start_migration(&self, shard_id: Uuid, target_node: &str) -> Result<Uuid> {
+    pub async fn start_migration(
+        self: Arc<Self>,
+        shard_id: Uuid,
+        target_node: &str,
+    ) -> Result<Uuid> {
         // Verify the shard exists
         let shard = self.get_shard(shard_id).await?;
 

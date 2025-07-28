@@ -241,3 +241,53 @@ pub fn semantic_merge(a: OntologyGraph, b: OntologyGraph) -> OntologyGraph {
     merged.merge(&b);
     merged
 }
+
+/// Entry definition for ontology graph
+#[hdk_entry(id = "ontology_graph")]
+#[derive(Clone)]
+pub struct OntologyGraphEntry {
+    pub graph_id: String,
+    pub concepts_count: usize,
+    pub relationships_count: usize,
+    pub version: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+/// Create a new ontology graph in the DHT
+#[hdk_extern]
+pub fn create_ontology_graph(input: CreateOntologyInput) -> ExternResult<String> {
+    let graph_id = uuid::Uuid::new_v4().to_string();
+    let now = crate::holochain::utils::sys_time()?;
+    
+    let graph = OntologyGraph::new(input.similarity_threshold);
+    
+    // Store the full graph in the DHT as chunks
+    // (In a real implementation, we would chunk the graph due to size limitations)
+    // For now, we'll just create an entry with metadata
+    
+    let entry = OntologyGraphEntry {
+        graph_id: graph_id.clone(),
+        concepts_count: 0,
+        relationships_count: 0,
+        version: "0".to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+    
+    let entry_hash = create_entry(&entry)?;
+    
+    // Index the graph
+    let path = crate::holochain::utils::create_path("ontology_graphs", vec![])?;
+    create_link(path.path_entry_hash()?, entry_hash, LinkTag::new(graph_id.as_bytes()))?;
+    
+    Ok(graph_id)
+}
+
+/// Input for creating an ontology graph
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateOntologyInput {
+    pub name: String,
+    pub description: String,
+    pub similarity_threshold: f32,
+}
