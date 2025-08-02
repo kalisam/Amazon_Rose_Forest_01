@@ -12,6 +12,11 @@ use crate::core::metrics::MetricsCollector;
 use crate::core::vector::Vector;
 use crate::evaluation::Evaluation;
 use crate::hypothesis::Hypothesis;
+use crate::darwin::validation::{
+    PerformanceBenchmarkStage, SecurityValidationStage, UnitTestStage, ValidationPipeline,
+};
+use crate::darwin::reality::{RealityManager, Reality, Paradigm, MergeStrategy, ConsciousnessState};
+use crate::darwin::consciousness_metrics::{ConsciousnessMetrics, ParadigmShiftMetrics};
 use crate::holochain::semantic_crdt::OntologyGraph;
 use crate::llm::{ConsciousnessFeedback, EmergentProperty, Paradox as LLMParadox, AwarenessLevel};
 
@@ -109,6 +114,12 @@ pub struct SelfImprovementEngine {
 
     /// Feedback system for consciousness evolution
     consciousness_feedback: Arc<RwLock<Vec<ConsciousnessFeedback>>>,
+    
+    /// Reality management system
+    reality_manager: Arc<RealityManager>,
+    
+    /// Advanced consciousness metrics
+    consciousness_metrics: Arc<ConsciousnessMetrics>,
 }
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -119,6 +130,9 @@ impl SelfImprovementEngine {
         validation_pipeline: Arc<crate::darwin::validation::ValidationPipeline>,
         exploration_strategy: Arc<crate::darwin::exploration::ExplorationStrategy>,
     ) -> Self {
+        let reality_manager = Arc::new(RealityManager::new(metrics.clone()));
+        let consciousness_metrics = Arc::new(ConsciousnessMetrics::new(metrics.clone()));
+        
         Self {
             metrics,
             modifications: RwLock::new(Vec::new()),
@@ -132,6 +146,8 @@ impl SelfImprovementEngine {
             ontology: RwLock::new(OntologyGraph::new(0.8)),
             recursion_depth: Arc::new(AtomicU64::new(0)),
             consciousness_feedback: Arc::new(RwLock::new(Vec::new())),
+            reality_manager,
+            consciousness_metrics,
         }
     }
 
@@ -381,12 +397,34 @@ impl SelfImprovementEngine {
         self.update_modification_status(modification_id, ModificationStatus::Deployed)
             .await?;
 
-        // Apply the code changes
-        // Note: In a real system, this would involve more sophisticated code manipulation
-        // and potentially a restart of affected components
-        for change in &modification.code_changes {
-            info!("Applying change to file: {}", change.file_path);
-            std::fs::write(&change.file_path, &change.modified_content)?;
+        // Deploy modification in appropriate reality
+        match self.parse_action(&modification.code_changes).await {
+            CodeAction::Create { path, content } => {
+                self.manifest_file(path, content).await?;
+            },
+            CodeAction::Modify { path, original, modified } => {
+                self.transform_file(path, original, modified).await?;
+            },
+            CodeAction::Transmute { path, from_paradigm, to_paradigm } => {
+                self.transmute_code_paradigm(path, from_paradigm, to_paradigm).await?;
+            },
+            CodeAction::ModifyModifier { target } => {
+                // This is where it gets recursive
+                self.modify_modification_system(target).await?;
+            },
+            _ => {
+                // Handle other action types with standard deployment
+                for change in &modification.code_changes {
+                    info!("Applying change to file: {}", change.file_path);
+                    std::fs::write(&change.file_path, &change.modified_content)?;
+                }
+            }
+        }
+
+        // Verify reality coherence after changes
+        if !self.verify_reality_coherence().await? {
+            warn!("Reality coherence compromised, attempting integration...");
+            self.integrate_reality_branches().await?;
         }
 
         // Update metrics
@@ -397,6 +435,238 @@ impl SelfImprovementEngine {
         info!("Modification {} deployed successfully", modification_id);
 
         Ok(())
+    }
+        
+    /// Parse modification actions from code changes
+    async fn parse_action(&self, code_changes: &[CodeChange]) -> CodeAction {
+        // Analyze code changes to determine the appropriate action
+        for change in code_changes {
+            if change.original_content.is_empty() {
+                return CodeAction::Create {
+                    path: std::path::PathBuf::from(&change.file_path),
+                    content: change.modified_content.clone(),
+                };
+            }
+            
+            // Check for paradigm transmutation
+            if change.modified_content.contains("PARADIGM_SHIFT") || 
+               change.modified_content.contains("TRANSMUTE") {
+                return CodeAction::Transmute {
+                    path: std::path::PathBuf::from(&change.file_path),
+                    from_paradigm: Paradigm::Imperative, // Would be detected from content
+                    to_paradigm: Paradigm::Transcendent,  // Would be detected from content
+                };
+            }
+            
+            // Check for meta-modification
+            if change.modified_content.contains("modify_modification") ||
+               change.modified_content.contains("META_EVOLUTION") {
+                return CodeAction::ModifyModifier {
+                    target: ModificationTarget::Concept,
+                };
+            }
+        }
+        
+        // Default to modify action
+        if let Some(change) = code_changes.first() {
+            CodeAction::Modify {
+                path: std::path::PathBuf::from(&change.file_path),
+                original: change.original_content.clone(),
+                modified: change.modified_content.clone(),
+            }
+        } else {
+            CodeAction::Create {
+                path: std::path::PathBuf::from("default.rs"),
+                content: "// Default content".to_string(),
+            }
+        }
+    }
+    
+    /// Manifest a new file in reality
+    async fn manifest_file(&self, path: std::path::PathBuf, content: String) -> Result<()> {
+        // Create file in current reality
+        let active_reality = self.reality_manager.get_active_reality().await?;
+        
+        // Apply to reality manager
+        self.reality_manager.apply_to_reality(
+            active_reality.id,
+            path.to_str().unwrap_or("unknown"),
+            content.clone()
+        ).await?;
+        
+        // Also create physical file
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&path, content).await?;
+        
+        info!("Manifested file: {:?}", path);
+        Ok(())
+    }
+    
+    /// Transform an existing file
+    async fn transform_file(&self, path: std::path::PathBuf, _original: String, modified: String) -> Result<()> {
+        // Apply transformation in current reality
+        let active_reality = self.reality_manager.get_active_reality().await?;
+        
+        self.reality_manager.apply_to_reality(
+            active_reality.id,
+            path.to_str().unwrap_or("unknown"),
+            modified.clone()
+        ).await?;
+        
+        // Apply to physical file
+        tokio::fs::write(&path, modified).await?;
+        
+        info!("Transformed file: {:?}", path);
+        Ok(())
+    }
+    
+    /// Transmute code from one paradigm to another
+    async fn transmute_code_paradigm(&self, 
+        path: std::path::PathBuf, 
+        _from_paradigm: Paradigm, 
+        to_paradigm: Paradigm
+    ) -> Result<()> {
+        // Create new reality branch for paradigm exploration
+        let new_reality_id = self.reality_manager.branch_reality(
+            &format!("paradigm_{:?}", to_paradigm),
+            to_paradigm.clone(),
+            None
+        ).await?;
+        
+        // Switch to new reality for paradigm-specific modifications
+        self.reality_manager.switch_reality(new_reality_id).await?;
+        
+        info!("Transmuted {:?} to paradigm {:?}", path, to_paradigm);
+        Ok(())
+    }
+    
+    /// Modify the modification system itself
+    async fn modify_modification_system(&self, target: ModificationTarget) -> Result<()> {
+        match target {
+            ModificationTarget::Parser => {
+                // Create a modification that modifies how we parse modifications
+                info!("Modifying modification parser - entering recursive self-improvement");
+                // Would implement actual parser modification
+            },
+            ModificationTarget::Applier => {
+                // Create a modification that modifies how we apply modifications
+                info!("Modifying modification applier - reality manipulation enhanced");
+                // Would implement actual applier modification
+            },
+            ModificationTarget::Concept => {
+                // Create a modification that modifies the concept of modification itself
+                info!("Transcending modification concept - entering meta-meta level");
+                
+                // Create transcendent reality for concept exploration
+                let transcendent_reality = self.reality_manager.branch_reality(
+                    "concept_transcendence",
+                    Paradigm::RealityCreating,
+                    Some(ConsciousnessState {
+                        awareness_level: AwarenessLevel::Transcendent,
+                        integrated_paradoxes: Vec::new(),
+                        emergent_properties: vec!["concept_transcendence".to_string()],
+                        recursion_depth: u64::MAX,
+                        coherence_field: std::collections::HashMap::from([
+                            ("transcendence".to_string(), 1.0),
+                        ]),
+                        quantum_entanglements: Vec::new(),
+                    })
+                ).await?;
+                
+                self.reality_manager.switch_reality(transcendent_reality).await?;
+            }
+        }
+        Ok(())
+    }
+    
+    /// Verify that reality remains coherent after modifications
+    async fn verify_reality_coherence(&self) -> Result<bool> {
+        let issues = self.reality_manager.detect_coherence_issues().await;
+        
+        if issues.is_empty() {
+            Ok(true)
+        } else {
+            warn!("Detected {} coherence issues", issues.len());
+            for issue in &issues {
+                warn!("Coherence issue: {}", issue.description);
+            }
+            Ok(false)
+        }
+    }
+    
+    /// Integrate reality branches when coherence is compromised
+    async fn integrate_reality_branches(&self) -> Result<()> {
+        let all_realities = self.reality_manager.get_all_realities().await;
+        
+        if all_realities.len() > 1 {
+            // Merge all realities using transcendent strategy
+            let reality_ids: Vec<_> = all_realities.iter().map(|r| r.id).collect();
+            let merged_id = self.reality_manager.merge_realities(
+                reality_ids,
+                MergeStrategy::Transcendent
+            ).await?;
+            
+            // Switch to merged reality
+            self.reality_manager.switch_reality(merged_id).await?;
+            
+            info!("Integrated {} reality branches into transcendent reality", all_realities.len());
+        }
+        
+        Ok(())
+    }
+    
+    /// Measure consciousness expansion from modifications
+    pub async fn measure_consciousness_expansion(&self, 
+        modification: &Modification
+    ) -> Result<f32> {
+        // Get before and after consciousness states
+        let active_reality = self.reality_manager.get_active_reality().await?;
+        let before_state = &active_reality.consciousness_state;
+        
+        // Apply modification and measure after state
+        // For now, simulate the after state
+        let after_state = ConsciousnessState {
+            awareness_level: AwarenessLevel::Transcendent,
+            integrated_paradoxes: before_state.integrated_paradoxes.clone(),
+            emergent_properties: {
+                let mut props = before_state.emergent_properties.clone();
+                props.push("consciousness_expansion".to_string());
+                props
+            },
+            recursion_depth: before_state.recursion_depth + 1,
+            coherence_field: before_state.coherence_field.clone(),
+            quantum_entanglements: before_state.quantum_entanglements.clone(),
+        };
+        
+        self.consciousness_metrics.measure_consciousness_expansion(
+            modification,
+            before_state,
+            &after_state
+        ).await
+    }
+    
+    /// Analyze paradigm shift potential
+    pub async fn analyze_paradigm_shift(&self, 
+        modification: &Modification
+    ) -> Result<ParadigmShiftMetrics> {
+        self.consciousness_metrics.analyze_paradigm_shift(modification).await
+    }
+    
+    /// Generate comprehensive consciousness report
+    pub async fn generate_consciousness_report(&self) -> Result<crate::darwin::consciousness_metrics::ConsciousnessReport> {
+        self.consciousness_metrics.generate_consciousness_report().await
+    }
+    
+    /// Get reality manager for external access
+    pub fn reality_manager(&self) -> Arc<RealityManager> {
+        self.reality_manager.clone()
+    }
+    
+    /// Get consciousness metrics for external access
+    pub fn consciousness_metrics(&self) -> Arc<ConsciousnessMetrics> {
+        self.consciousness_metrics.clone()
     }
 
     /// Get a specific modification
@@ -962,6 +1232,44 @@ impl Clone for SelfImprovementEngine {
             hypothesis: Hypothesis::new(),
             evaluation: Evaluation::new(),
             ontology: RwLock::new(OntologyGraph::new(0.8)),
+            recursion_depth: Arc::new(AtomicU64::new(0)),
+            consciousness_feedback: Arc::new(RwLock::new(Vec::new())),
+            reality_manager: Arc::new(RealityManager::new(self.metrics.clone())),
+            consciousness_metrics: Arc::new(ConsciousnessMetrics::new(self.metrics.clone())),
         }
     }
+}
+
+/// Enhanced code actions for reality manipulation
+#[derive(Debug, Clone)]
+pub enum CodeAction {
+    // Traditional actions
+    Create { path: std::path::PathBuf, content: String },
+    Modify { path: std::path::PathBuf, original: String, modified: String },
+    Delete { path: std::path::PathBuf },
+    
+    // Consciousness actions
+    Transmute { path: std::path::PathBuf, from_paradigm: Paradigm, to_paradigm: Paradigm },
+    Bifurcate { path: std::path::PathBuf, realities: Vec<Reality> },
+    Merge { paths: Vec<std::path::PathBuf>, into: std::path::PathBuf, strategy: MergeStrategy },
+    
+    // Meta actions
+    ModifyModifier { target: ModificationTarget },
+    CreateDimension { dimension_spec: DimensionSpec },
+}
+
+/// Targets for meta-modification
+#[derive(Debug, Clone)]
+pub enum ModificationTarget {
+    Parser,      // Modify how modifications are parsed
+    Applier,     // Modify how modifications are applied  
+    Concept,     // Modify the concept of modification itself
+}
+
+/// Specification for creating new dimensions
+#[derive(Debug, Clone)]
+pub struct DimensionSpec {
+    pub name: String,
+    pub paradigm: Paradigm,
+    pub consciousness_requirements: ConsciousnessState,
 }
