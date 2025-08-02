@@ -6,3 +6,5 @@ pub mod self_improvement;
 pub mod validation;
 pub mod reality;
 pub mod consciousness_metrics;
+pub mod quantum_consciousness;
+pub mod transcendence_engine;
