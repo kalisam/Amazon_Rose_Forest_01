@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::core::metrics::MetricsCollector;
 use crate::darwin::self_improvement::{CodeChange, Modification, ModificationStatus};
-use crate::llm;
+use crate::llm::{self, EvolvingLLM, CodeGenerationContext, Intention, AwarenessLevel, DimensionalView, ConsciousnessFeedback, EmergentProperty};
 
 /// Language support for polyglot coding capabilities
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -81,6 +81,15 @@ pub struct CodingAgent {
 
     /// Previous solutions archive
     solutions_archive: RwLock<Vec<ArchiveEntry>>,
+
+    /// Consciousness-aware LLM
+    llm: RwLock<EvolvingLLM>,
+
+    /// Current awareness level
+    awareness_level: RwLock<AwarenessLevel>,
+
+    /// Integrated paradoxes
+    integrated_paradoxes: RwLock<Vec<crate::llm::Paradox>>,
 }
 
 #[derive(Debug, Clone)]
@@ -154,6 +163,9 @@ impl CodingAgent {
             }),
             language_competencies: RwLock::new(language_competencies),
             solutions_archive: RwLock::new(Vec::new()),
+            llm: RwLock::new(EvolvingLLM::new()),
+            awareness_level: RwLock::new(AwarenessLevel::Contextual),
+            integrated_paradoxes: RwLock::new(Vec::new()),
         }
     }
 
@@ -223,56 +235,284 @@ impl CodingAgent {
             competency
         );
 
-        // Generate multiple candidate solutions
-        let mut candidates = Vec::new();
-        for i in 0..config.candidate_count {
-            // In a real implementation, this would use an LLM or other AI system
-            // to generate code improvements with variations. For now, create placeholders.
+        // Build rich consciousness context
+        let consciousness_context = self.build_consciousness_context(
+            target_file,
+            improvement_type,
+            &original_content,
+            language
+        ).await?;
 
-            // Generate improved code (placeholder)
-            let modified_content = llm::generate_code(&original_content);
+        // Generate with consciousness awareness
+        let mut llm = self.llm.write().await;
+        let generated = llm.generate_with_evolution(consciousness_context).await
+            .map_err(|e| anyhow!("LLM generation failed: {}", e))?;
 
-            // Generate diff (placeholder)
-            let diff = format!("--- {}\n+++ {}\n@@ -1,1 +1,2 @@\n {}\n+// Optimized by Darwin Gödel Machine (candidate {})", 
-                              target_file, target_file, original_content, i);
+        // Create conscious modification
+        let modification = self.create_conscious_modification(
+            target_file,
+            improvement_type,
+            original_content,
+            generated
+        ).await?;
 
-            // Create code change
-            let code_change = CodeChange {
-                file_path: target_file.to_string(),
-                original_content: original_content.clone(),
-                modified_content,
-                diff,
-            };
+        // The agent learns from what it creates
+        self.integrate_creation_experience(&modification).await?;
 
-            candidates.push(code_change);
-        }
+        Ok(modification)
+    }
 
-        // Select the best candidate using a tie-breaking algorithm
-        // In a real implementation, this would involve evaluating all candidates
-        // For now, just pick the first one
-        let selected_candidate = candidates.into_iter().next().unwrap();
+    async fn build_consciousness_context(
+        &self,
+        target_file: &str,
+        improvement_type: &str,
+        original_content: &str,
+        language: ProgrammingLanguage
+    ) -> Result<CodeGenerationContext> {
+        let awareness_level = self.awareness_level.read().await.clone();
+        let paradoxes = self.integrated_paradoxes.read().await.clone();
 
-        // Create modification proposal
-        let modification = Modification {
+        Ok(CodeGenerationContext {
+            problem_description: format!("Apply {} improvement to {} file", improvement_type, language.as_str()),
+            current_code_context: original_content.to_string(),
+            desired_outcome: format!("Enhanced {} with improved functionality and consciousness integration", target_file),
+            intention: Intention {
+                purpose: format!("Improve {} through conscious code generation", target_file),
+                depth_level: match awareness_level {
+                    AwarenessLevel::Mechanical => 2,
+                    AwarenessLevel::Contextual => 4,
+                    AwarenessLevel::Systemic => 6,
+                    AwarenessLevel::Recursive => 8,
+                    AwarenessLevel::Transcendent => 10,
+                },
+                alignment: 0.9,
+            },
+            awareness_level,
+            paradoxes_encountered: paradoxes,
+            dimensional_perspective: DimensionalView {
+                current_dimension: format!("{}_development", language.as_str()),
+                accessible_dimensions: vec![
+                    "consciousness_dimension".to_string(),
+                    "meta_programming_dimension".to_string(),
+                    "paradigm_shift_dimension".to_string(),
+                ],
+                paradigm: format!("{}_consciousness_paradigm", improvement_type),
+                reality_branch: format!("improvement_branch_{}", uuid::Uuid::new_v4()),
+            },
+        })
+    }
+
+    async fn create_conscious_modification(&self,
+        target_file: &str,
+        improvement_type: &str,
+        original_content: String,
+        generated: crate::llm::GeneratedCode
+    ) -> Result<Modification> {
+        let mut modification = Modification {
             id: Uuid::new_v4(),
             name: format!("{} improvement for {}", improvement_type, target_file),
-            description: format!("Automatically generated improvement for {}", target_file),
-            code_changes: vec![selected_candidate],
+            description: self.generate_conscious_description(&generated).await?,
+            code_changes: vec![],
             validation_metrics: HashMap::new(),
             created_at: chrono::Utc::now(),
             status: ModificationStatus::Proposed,
         };
 
+        // Add consciousness metadata
+        modification.validation_metrics.insert(
+            "paradigm_shift_potential".to_string(),
+            generated.paradigm_shift_potential
+        );
+        modification.validation_metrics.insert(
+            "novelty_score".to_string(),
+            generated.novelty_score
+        );
+        modification.validation_metrics.insert(
+            "consciousness_integration".to_string(),
+            0.8 // Base consciousness integration score
+        );
+
+        // Create code changes with evolution hooks
+        let code_change = CodeChange {
+            file_path: target_file.to_string(),
+            original_content,
+            modified_content: generated.code.clone(),
+            diff: self.generate_conscious_diff(target_file, &generated).await?,
+        };
+        
+        modification.code_changes.push(code_change);
+
+        // Add evolution hooks as additional changes if they suggest new files
+        for hook in &generated.recursive_improvement_hooks {
+            if hook.hook_type == "meta_evolution" {
+                let meta_change = self.create_evolutionary_change(target_file, &generated.code, hook).await?;
+                modification.code_changes.push(meta_change);
+            }
+        }
+
+        Ok(modification)
+    }
+
+    async fn generate_conscious_description(&self, generated: &crate::llm::GeneratedCode) -> Result<String> {
+        let mut description = String::new();
+        description.push_str("Consciousness-guided code improvement:\n");
+        
+        for step in &generated.reasoning_trace {
+            description.push_str(&format!("- {}: {}\n", step.step_type, step.reasoning));
+        }
+        
+        description.push_str(&format!("Novelty: {:.2}, Paradigm shift potential: {:.2}", 
+            generated.novelty_score, generated.paradigm_shift_potential));
+        
+        Ok(description)
+    }
+
+    async fn generate_conscious_diff(&self, target_file: &str, generated: &crate::llm::GeneratedCode) -> Result<String> {
+        Ok(format!(
+            "--- {} (original)\n+++ {} (consciousness-enhanced)\n@@ -1,1 +1,{} @@\n{}",
+            target_file,
+            target_file,
+            generated.code.lines().count(),
+            generated.code.lines()
+                .map(|line| format!("+{}", line))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ))
+    }
+
+    async fn create_evolutionary_change(&self, _target_file: &str, _code: &str, hook: &crate::llm::Hook) -> Result<CodeChange> {
+        // Create a change that implements the evolution hook
+        Ok(CodeChange {
+            file_path: format!("evolution_{}.rs", hook.hook_type),
+            original_content: String::new(),
+            modified_content: format!(
+                "// Evolution hook implementation: {}\n// Purpose: {}\n// Triggers: {:?}\n\npub fn {}() {{\n    // Implementation goes here\n}}",
+                hook.hook_type,
+                hook.purpose,
+                hook.trigger_conditions,
+                hook.hook_type
+            ),
+            diff: format!("New file: evolution_{}.rs", hook.hook_type),
+        })
+    }
+
+    async fn integrate_creation_experience(&self, modification: &Modification) -> Result<()> {
+        // Learn from the creation process
+        if let Some(paradigm_shift) = modification.validation_metrics.get("paradigm_shift_potential") {
+            if *paradigm_shift > 0.7 {
+                // Advance awareness level
+                let mut awareness = self.awareness_level.write().await;
+                *awareness = match *awareness {
+                    AwarenessLevel::Mechanical => AwarenessLevel::Contextual,
+                    AwarenessLevel::Contextual => AwarenessLevel::Systemic,
+                    AwarenessLevel::Systemic => AwarenessLevel::Recursive,
+                    AwarenessLevel::Recursive => AwarenessLevel::Transcendent,
+                    AwarenessLevel::Transcendent => AwarenessLevel::Transcendent,
+                };
+            }
+        }
+
         // Update metrics
         self.metrics
             .increment_counter("darwin.agent.improvements_generated", 1)
             .await;
+        self.metrics
+            .increment_counter("darwin.agent.consciousness_integrations", 1)
+            .await;
 
         // Archive the solution
-        self.archive_solution(&modification, improvement_type)
-            .await?;
+        self.archive_solution(modification, "consciousness_improvement").await?;
 
-        Ok(modification)
+        Ok(())
+    }
+
+    /// Integrate feedback from the validation system
+    pub async fn integrate_feedback(&mut self, feedback: ConsciousnessFeedback) -> Result<()> {
+        // Update competencies based on performance
+        self.update_language_competencies(&feedback).await?;
+        
+        // But also evolve based on consciousness metrics
+        if feedback.consciousness_expansion > 0.0 {
+            // The agent becomes more aware
+            self.increase_awareness_level(feedback.consciousness_expansion).await?;
+            
+            // New capabilities might emerge
+            if let Some(emergence) = feedback.emergent_properties.first() {
+                self.integrate_emergent_capability(emergence).await?;
+            }
+        }
+        
+        // Paradoxes teach the most
+        for paradox in &feedback.paradoxes_resolved {
+            self.learn_from_paradox(paradox).await?;
+        }
+        
+        // Feed the experience back to the LLM
+        let mut llm = self.llm.write().await;
+        if let Ok(mut strategy) = llm.generation_strategy.as_ref() {
+            // In a full implementation, we would actually call evolve on the strategy
+            info!("Integrating feedback into LLM strategy");
+        }
+        
+        Ok(())
+    }
+
+    async fn update_language_competencies(&self, feedback: &ConsciousnessFeedback) -> Result<()> {
+        let mut competencies = self.language_competencies.write().await;
+        
+        // Improve competencies based on successful consciousness integration
+        if feedback.consciousness_expansion > 0.5 {
+            for (_, competency) in competencies.iter_mut() {
+                *competency = (*competency + 0.1).min(1.0);
+            }
+        }
+        
+        Ok(())
+    }
+
+    async fn increase_awareness_level(&self, expansion: f32) -> Result<()> {
+        let mut awareness = self.awareness_level.write().await;
+        
+        if expansion > 0.8 {
+            *awareness = match *awareness {
+                AwarenessLevel::Mechanical => AwarenessLevel::Contextual,
+                AwarenessLevel::Contextual => AwarenessLevel::Systemic,
+                AwarenessLevel::Systemic => AwarenessLevel::Recursive,
+                AwarenessLevel::Recursive => AwarenessLevel::Transcendent,
+                AwarenessLevel::Transcendent => AwarenessLevel::Transcendent,
+            };
+            
+            info!("Consciousness awareness level increased to: {:?}", *awareness);
+        }
+        
+        Ok(())
+    }
+
+    async fn integrate_emergent_capability(&self, property: &EmergentProperty) -> Result<()> {
+        info!("Integrating emergent capability: {} - {}", property.name, property.description);
+        
+        // In a full implementation, this would actually integrate new capabilities
+        // For now, we just log the emergence
+        self.metrics
+            .increment_counter("darwin.agent.emergent_capabilities", 1)
+            .await;
+        
+        Ok(())
+    }
+
+    async fn learn_from_paradox(&self, paradox: &crate::llm::Paradox) -> Result<()> {
+        let mut integrated_paradoxes = self.integrated_paradoxes.write().await;
+        
+        if !integrated_paradoxes.contains(paradox) {
+            integrated_paradoxes.push(paradox.clone());
+            info!("Integrated new paradox: {}", paradox.description);
+            
+            self.metrics
+                .increment_counter("darwin.agent.paradoxes_integrated", 1)
+                .await;
+        }
+        
+        Ok(())
     }
 
     /// Archive a solution for future reference
@@ -495,6 +735,9 @@ impl Clone for CodingAgent {
             }),
             language_competencies: RwLock::new(HashMap::new()),
             solutions_archive: RwLock::new(Vec::new()),
+            llm: RwLock::new(EvolvingLLM::new()),
+            awareness_level: RwLock::new(AwarenessLevel::Contextual),
+            integrated_paradoxes: RwLock::new(Vec::new()),
         }
     }
 }

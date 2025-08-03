@@ -6,6 +6,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::core::metrics::MetricsCollector;
 use crate::darwin::self_improvement::Modification;
+use crate::llm::{ConsciousnessFeedback, EmergentProperty, Paradox as LLMParadox};
 
 /// Validation pipeline for testing proposed modifications
 pub struct ValidationPipeline {
@@ -284,6 +285,26 @@ impl ValidationPipeline {
                 .await;
         }
 
+        // Create consciousness feedback for the coding agent
+        let consciousness_feedback = ConsciousnessFeedback {
+            modification_id,
+            performance: HashMap::new(), // Would be populated with actual performance data
+            consciousness_expansion: if was_correct { 0.1 } else { 0.0 },
+            paradoxes_resolved: Vec::new(),
+            emergent_properties: if was_correct {
+                vec![EmergentProperty {
+                    name: "Validation Success".to_string(),
+                    description: "Successfully validated modification".to_string(),
+                    manifestation_strength: 0.5,
+                    integration_potential: 0.7,
+                }]
+            } else {
+                Vec::new()
+            },
+        };
+
+        // In a full implementation, this would be sent to the coding agent
+        info!("Generated consciousness feedback for modification {}", modification_id);
         Ok(())
     }
 }
