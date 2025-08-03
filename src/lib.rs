@@ -13,6 +13,12 @@ pub mod network;
 pub mod server;
 pub mod sharding;
 pub mod utils;
+pub mod code_analysis;
+pub mod hypothesis;
+pub mod evaluation;
+pub mod ad4m;
+pub mod ipfs;
+pub mod semantic_crdt;
 
 // Export common types for easier access
 pub use crate::consciousness::ad4m_bridge::Ad4mBridge;

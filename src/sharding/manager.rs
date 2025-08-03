@@ -271,7 +271,7 @@ impl ShardManager {
             .await?;
 
         // Start the migration in the background
-        let self_clone = Arc::clone(&self);
+        let self_clone = Arc::new(self.clone());
         tokio::spawn(async move {
             if let Err(e) = self_clone.execute_migration(migration_id).await {
                 error!("Migration {} failed: {}", migration_id, e);
@@ -286,7 +286,7 @@ impl ShardManager {
         Ok(migration_id)
     }
 
-    async fn execute_migration(&self, migration_id: Uuid) -> Result<()> {
+    async fn execute_migration(self: Arc<Self>, migration_id: Uuid) -> Result<()> {
         // Get the migration task
         let task = {
             let migrations = self.migrations.read().await;
@@ -485,4 +485,3 @@ impl Clone for ShardManager {
         }
     }
 }
-

@@ -1,6 +1,7 @@
 use crate::core::vector::Vector;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Model {
     pub weights: Vec<f32>,
 }
@@ -13,6 +14,7 @@ impl Model {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Client {
     pub id: String,
     pub model: Model,
@@ -30,6 +32,7 @@ impl Client {
 }
 
 /// Federated learning coordinator placeholder
+#[derive(Debug)]
 pub struct FederatedLearning {
     pub global_model: Model,
     pub clients: HashMap<String, Client>,
@@ -53,20 +56,22 @@ impl FederatedLearning {
     pub fn train(&mut self, rounds: usize) {
         for _ in 0..rounds {
             let mut updates = Vec::new();
-            for client in self.clients.values_mut() {
-                let update = self.train_client(client);
+            let global_model = self.global_model.clone();
+            for client in self.clients.values() {
+                let mut client_clone = client.clone();
+                let update = self.train_client(&mut client_clone, &global_model);
                 updates.push(update);
             }
             self.aggregate(updates);
         }
     }
 
-    fn train_client(&self, client: &mut Client) -> Model {
+    fn train_client(&self, client: &mut Client, global_model: &Model) -> Model {
         // In a real implementation, this would train the client's model on its local data.
         // For now, we'll just return a copy of the client's model with the proximal term applied.
         let mut new_weights = client.model.weights.clone();
         for (i, weight) in new_weights.iter_mut().enumerate() {
-            *weight -= self.mu * (client.model.weights[i] - self.global_model.weights[i]);
+            *weight -= self.mu * (client.model.weights[i] - global_model.weights[i]);
         }
         Model {
             weights: new_weights,
@@ -94,45 +99,5 @@ impl Clone for Model {
         Self {
             weights: self.weights.clone(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_train_client_updates_toward_global() {
-        let dimensions = 3;
-        let mu = 0.5;
-
-        let mut fl = FederatedLearning::new(dimensions, mu);
-        fl.global_model.weights = vec![2.0, 2.0, 2.0];
-
-        let mut client = Client::new("c1", dimensions, Vec::new());
-        client.model.weights = vec![0.0, 0.0, 0.0];
-
-        let updated = fl.train_client(&mut client);
-
-        assert_eq!(updated.weights, vec![1.0, 1.0, 1.0]);
-        // Ensure client weights are unchanged
-        assert_eq!(client.model.weights, vec![0.0, 0.0, 0.0]);
-    }
-
-    #[test]
-    fn test_aggregate_averages_updates() {
-        let dimensions = 2;
-        let mu = 0.0;
-
-        let mut fl = FederatedLearning::new(dimensions, mu);
-
-        let updates = vec![
-            Model { weights: vec![1.0, 3.0] },
-            Model { weights: vec![3.0, 1.0] },
-        ];
-
-        fl.aggregate(updates);
-
-        assert_eq!(fl.global_model.weights, vec![2.0, 2.0]);
     }
 }

@@ -1,6 +1,7 @@
 use ad4m_client::Client;
 use anyhow::Result;
 
+#[derive(Debug)]
 pub struct Ad4mManager {
     client: Client,
 }

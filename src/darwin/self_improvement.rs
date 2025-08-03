@@ -12,6 +12,7 @@ use crate::core::metrics::MetricsCollector;
 use crate::core::vector::Vector;
 use crate::evaluation::Evaluation;
 use crate::hypothesis::Hypothesis;
+use crate::semantic_crdt::OntologyGraph;
 use crate::darwin::validation::{
     PerformanceBenchmarkStage, SecurityValidationStage, UnitTestStage, ValidationPipeline,
 };
@@ -19,6 +20,7 @@ use crate::darwin::reality::{RealityManager, Reality, Paradigm, MergeStrategy, C
 use crate::darwin::consciousness_metrics::{ConsciousnessMetrics, ParadigmShiftMetrics};
 use crate::holochain::semantic_crdt::OntologyGraph;
 use crate::llm::{ConsciousnessFeedback, EmergentProperty, Paradox as LLMParadox, AwarenessLevel};
+
 
 /// Represents a proposed modification to the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -825,6 +827,8 @@ impl SelfImprovementEngine {
 
         let id = self.propose_modification(proposal).await?;
 
+        info!("Generated 1 new modification proposals");
+
         Ok(vec![id])
     }
     
@@ -1042,10 +1046,10 @@ impl SelfImprovementEngine {
 
         let mut ontology = self.ontology.write().await;
         ontology.add_concept(
-            crate::holochain::semantic_crdt::Concept {
+            crate::semantic_crdt::Concept {
                 id: Uuid::new_v4().to_string(),
-                name: "Consciousness".to_string(),
-                description: "System consciousness expansion through recursive improvement".to_string(),
+                name: "Hypothesis".to_string(),
+                description: hypothesis.clone(),
                 embedding: vec![],
                 metadata: HashMap::new(),
             },
