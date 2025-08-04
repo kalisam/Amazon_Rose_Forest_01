@@ -1,21 +1,24 @@
 #[rustfmt::skip]
 use crate::core::metrics::MetricsCollector;
 use crate::nerv::runtime::Runtime;
+use crate::server::api::{
+    convert_search_results, create_vector, ErrorResponse, SearchVectorsRequest,
+};
+use crate::server::metrics::{HTTP_REQUEST_DURATION, INCOMING_REQUESTS};
 use crate::sharding::manager::ShardManager;
 use anyhow::{anyhow, Result};
+use futures::{SinkExt, StreamExt};
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock as StdRwLock};
 use std::time::Instant;
 use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
+use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
-use warp::ws::{Message, WebSocket};
-use futures::{StreamExt, SinkExt};
-use tokio::sync::broadcast;
-use crate::server::api::{SearchVectorsRequest, ErrorResponse, create_vector, convert_search_results};
 use uuid::Uuid;
+use warp::ws::{Message, WebSocket};
 use warp::{Filter, Reply};
 
 /// Server configuration
@@ -86,7 +89,7 @@ impl Server {
         *self.start_time.write().unwrap() = Some(Instant::now());
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
-      
+
         let server = warp::serve(self.filter());
 
         info!("Starting server on {}", addr);
@@ -136,18 +139,29 @@ impl Server {
             let req = match req {
                 Ok(r) => r,
                 Err(e) => {
-                    let err = ErrorResponse { error: e.to_string() };
-                    let _ = tx_ws.send(Message::text(serde_json::to_string(&err).unwrap())).await;
+                    let err = ErrorResponse {
+                        error: e.to_string(),
+                    };
+                    let _ = tx_ws
+                        .send(Message::text(serde_json::to_string(&err).unwrap()))
+                        .await;
                     continue;
                 }
             };
 
             let query = create_vector(req.query_vector.clone());
-            let results = match manager.search_vectors(req.shard_id, &query, req.limit).await {
+            let results = match manager
+                .search_vectors(req.shard_id, &query, req.limit)
+                .await
+            {
                 Ok(r) => r,
                 Err(e) => {
-                    let err = ErrorResponse { error: e.to_string() };
-                    let _ = tx_ws.send(Message::text(serde_json::to_string(&err).unwrap())).await;
+                    let err = ErrorResponse {
+                        error: e.to_string(),
+                    };
+                    let _ = tx_ws
+                        .send(Message::text(serde_json::to_string(&err).unwrap()))
+                        .await;
                     continue;
                 }
             };
@@ -169,7 +183,6 @@ impl Server {
             let _ = forward.await;
         }
     }
-
 
     /// Get the Warp filter for this server
     pub fn filter(
@@ -193,59 +206,57 @@ impl Server {
         shard_manager: Option<Arc<ShardManager>>,
         start_time: Arc<StdRwLock<Option<Instant>>>,
     ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        let health_route = warp::path("health").map(move || {
+        let health_route = with_request_metrics(warp::path("health").map(move || {
             debug!("Health check request received");
             warp::reply::json(&serde_json::json!({
                 "status": "ok",
                 "version": crate::VERSION,
             }))
-        });
+        }));
 
         let metrics_path = config.metrics_path.trim_start_matches('/').to_string();
         let metrics_route = if config.enable_metrics {
             let metrics_clone = metrics.clone();
-            warp::path(metrics_path.clone())
-                .map(move || {
-                    debug!("Metrics request received");
-                    let prometheus_metrics = metrics_clone.prometheus_metrics();
-                    warp::reply::with_header(
-                        prometheus_metrics,
-                        "Content-Type",
-                        "text/plain; version=0.0.4",
-                    )
-                    .into_response()
-                })
-                .boxed()
+            with_request_metrics(warp::path(metrics_path.clone()).map(move || {
+                debug!("Metrics request received");
+                let prometheus_metrics = metrics_clone.prometheus_metrics();
+                warp::reply::with_header(
+                    prometheus_metrics,
+                    "Content-Type",
+                    "text/plain; version=0.0.4",
+                )
+                .into_response()
+            }))
+            .boxed()
         } else {
-            warp::path(metrics_path)
-                .map(|| {
-                    warp::reply::with_status(
-                        "Metrics endpoint disabled",
-                        warp::http::StatusCode::NOT_FOUND,
-                    )
-                    .into_response()
-                })
-                .boxed()
+            with_request_metrics(warp::path(metrics_path).map(|| {
+                warp::reply::with_status(
+                    "Metrics endpoint disabled",
+                    warp::http::StatusCode::NOT_FOUND,
+                )
+                .into_response()
+            }))
+            .boxed()
         };
 
         let api_path = config.api_path.trim_start_matches('/').to_string();
         let api_routes = if config.enable_api {
             // API version endpoint
-            let version_route = warp::path(api_path.clone())
-                .and(warp::path("version"))
-                .map(|| {
-                    warp::reply::json(&serde_json::json!({
-                        "version": crate::VERSION,
-                    }))
-                    .into_response()
-                })
+            let version_route =
+                with_request_metrics(warp::path(api_path.clone()).and(warp::path("version")).map(
+                    || {
+                        warp::reply::json(&serde_json::json!({
+                            "version": crate::VERSION,
+                        }))
+                        .into_response()
+                    },
+                ))
                 .boxed();
 
             // Statistics endpoint
             let stats_start_time = start_time.clone();
-            let stats_route = warp::path(api_path)
-                .and(warp::path("stats"))
-                .map(move || {
+            let stats_route = with_request_metrics(
+                warp::path(api_path).and(warp::path("stats")).map(move || {
                     let mut sys = System::new();
                     let pid = get_current_pid().unwrap();
                     sys.refresh_process(pid);
@@ -262,35 +273,34 @@ impl Server {
                     });
 
                     warp::reply::json(&stats).into_response()
-                })
-                .boxed();
+                }),
+            )
+            .boxed();
             version_route.or(stats_route).unify().boxed()
         } else {
-            warp::path(api_path)
-                .map(|| {
-                    warp::reply::with_status(
-                        "API endpoint disabled",
-                        warp::http::StatusCode::NOT_FOUND,
-                    )
+            with_request_metrics(warp::path(api_path).map(|| {
+                warp::reply::with_status("API endpoint disabled", warp::http::StatusCode::NOT_FOUND)
                     .into_response()
-                })
-                .boxed()
+            }))
+            .boxed()
         };
 
         let ws_search_route = {
             let manager_opt = shard_manager.clone();
-            warp::path("ws")
-                .and(warp::path("search"))
-                .and(warp::ws())
-                .map(move |ws: warp::ws::Ws| {
-                    let manager_clone = manager_opt.clone();
-                    ws.on_upgrade(move |socket| async move {
-                        if let Some(manager) = manager_clone {
-                            Server::handle_ws_search(socket, manager).await;
-                        }
-                    })
-                })
-                .boxed()
+            with_request_metrics(
+                warp::path("ws")
+                    .and(warp::path("search"))
+                    .and(warp::ws())
+                    .map(move |ws: warp::ws::Ws| {
+                        let manager_clone = manager_opt.clone();
+                        ws.on_upgrade(move |socket| async move {
+                            if let Some(manager) = manager_clone {
+                                Server::handle_ws_search(socket, manager).await;
+                            }
+                        })
+                    }),
+            )
+            .boxed()
         };
 
         health_route
@@ -298,4 +308,32 @@ impl Server {
             .or(api_routes)
             .or(ws_search_route)
     }
+}
+
+fn with_request_metrics<F, R>(
+    filter: F,
+) -> impl Filter<Extract = (warp::reply::Response,), Error = warp::Rejection> + Clone
+where
+    F: Filter<Extract = (R,), Error = warp::Rejection> + Clone + Send + Sync + 'static,
+    R: Reply + 'static,
+{
+    warp::filters::method::method()
+        .and(warp::path::full())
+        .and(warp::any().map(Instant::now))
+        .and(filter)
+        .map(
+            |method: warp::http::Method, path: warp::path::FullPath, start: Instant, reply: R| {
+                let response = reply.into_response();
+                let status = response.status().as_u16().to_string();
+                let method_str = method.as_str();
+                let path_str = path.as_str();
+                INCOMING_REQUESTS
+                    .with_label_values(&[method_str, path_str])
+                    .inc();
+                HTTP_REQUEST_DURATION
+                    .with_label_values(&[method_str, path_str, &status])
+                    .observe(start.elapsed().as_secs_f64());
+                response
+            },
+        )
 }
