@@ -1,22 +1,34 @@
 #[rustfmt::skip]
 use crate::core::metrics::MetricsCollector;
 use crate::nerv::runtime::Runtime;
+use crate::server::api::{
+    convert_search_results, create_vector, parse_distance_metric, AddVectorRequest,
+    AddVectorResponse, CreateIndexRequest, CreateIndexResponse, CreateShardRequest,
+    CreateShardResponse, ErrorResponse, SearchVectorsRequest, SearchVectorsResponse,
+};
 use crate::sharding::manager::ShardManager;
 use anyhow::{anyhow, Result};
+use futures::{SinkExt, StreamExt};
 use prometheus::{Encoder, Registry, TextEncoder};
+use serde::de::DeserializeOwned;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock as StdRwLock};
 use std::time::Instant;
 use sysinfo::{get_current_pid, ProcessExt, System, SystemExt};
+use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
-use warp::ws::{Message, WebSocket};
-use futures::{StreamExt, SinkExt};
-use tokio::sync::broadcast;
-use crate::server::api::{SearchVectorsRequest, ErrorResponse, create_vector, convert_search_results};
 use uuid::Uuid;
+use warp::ws::{Message, WebSocket};
 use warp::{Filter, Reply};
+
+fn json_body<T>() -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone
+where
+    T: DeserializeOwned + Send + 'static,
+{
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+}
 
 /// Server configuration
 #[derive(Debug, Clone)]
@@ -86,7 +98,7 @@ impl Server {
         *self.start_time.write().unwrap() = Some(Instant::now());
         let addr = format!("{}:{}", self.config.address, self.config.port);
         let addr: SocketAddr = addr.parse()?;
-      
+
         let server = warp::serve(self.filter());
 
         info!("Starting server on {}", addr);
@@ -136,18 +148,29 @@ impl Server {
             let req = match req {
                 Ok(r) => r,
                 Err(e) => {
-                    let err = ErrorResponse { error: e.to_string() };
-                    let _ = tx_ws.send(Message::text(serde_json::to_string(&err).unwrap())).await;
+                    let err = ErrorResponse {
+                        error: e.to_string(),
+                    };
+                    let _ = tx_ws
+                        .send(Message::text(serde_json::to_string(&err).unwrap()))
+                        .await;
                     continue;
                 }
             };
 
             let query = create_vector(req.query_vector.clone());
-            let results = match manager.search_vectors(req.shard_id, &query, req.limit).await {
+            let results = match manager
+                .search_vectors(req.shard_id, &query, req.limit)
+                .await
+            {
                 Ok(r) => r,
                 Err(e) => {
-                    let err = ErrorResponse { error: e.to_string() };
-                    let _ = tx_ws.send(Message::text(serde_json::to_string(&err).unwrap())).await;
+                    let err = ErrorResponse {
+                        error: e.to_string(),
+                    };
+                    let _ = tx_ws
+                        .send(Message::text(serde_json::to_string(&err).unwrap()))
+                        .await;
                     continue;
                 }
             };
@@ -169,7 +192,6 @@ impl Server {
             let _ = forward.await;
         }
     }
-
 
     /// Get the Warp filter for this server
     pub fn filter(
@@ -240,10 +262,9 @@ impl Server {
                     .into_response()
                 })
                 .boxed();
-
             // Statistics endpoint
             let stats_start_time = start_time.clone();
-            let stats_route = warp::path(api_path)
+            let stats_route = warp::path(api_path.clone())
                 .and(warp::path("stats"))
                 .map(move || {
                     let mut sys = System::new();
@@ -264,7 +285,202 @@ impl Server {
                     warp::reply::json(&stats).into_response()
                 })
                 .boxed();
-            version_route.or(stats_route).unify().boxed()
+
+            let manager_for_create = shard_manager.clone();
+            let create_shard = warp::path(api_path.clone())
+                .and(warp::path("shards"))
+                .and(warp::post())
+                .and(json_body::<CreateShardRequest>())
+                .and_then(move |req: CreateShardRequest| {
+                    let manager_opt = manager_for_create.clone();
+                    async move {
+                        if let Some(manager) = manager_opt {
+                            match manager.create_shard(&req.name).await {
+                                Ok(id) => Ok::<_, warp::Rejection>(
+                                    warp::reply::json(&CreateShardResponse { shard_id: id })
+                                        .into_response(),
+                                ),
+                                Err(e) => Ok(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse {
+                                        error: e.to_string(),
+                                    }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                )
+                                .into_response()),
+                            }
+                        } else {
+                            Ok::<_, warp::Rejection>(
+                                warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse {
+                                        error: "Shard manager not configured".into(),
+                                    }),
+                                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                )
+                                .into_response(),
+                            )
+                        }
+                    }
+                })
+                .boxed();
+
+            let manager_for_index = shard_manager.clone();
+            let create_index = warp::path(api_path.clone())
+                .and(warp::path("indexes"))
+                .and(warp::post())
+                .and(json_body::<CreateIndexRequest>())
+                .and_then(move |req: CreateIndexRequest| {
+                    let manager_opt = manager_for_index.clone();
+                    async move {
+                        if let Some(manager) = manager_opt {
+                            match parse_distance_metric(&req.distance_metric) {
+                                Ok(metric) => match manager
+                                    .create_vector_index(
+                                        req.shard_id,
+                                        &req.name,
+                                        req.dimensions,
+                                        metric,
+                                    )
+                                    .await
+                                {
+                                    Ok(_) => Ok::<_, warp::Rejection>(
+                                        warp::reply::json(&CreateIndexResponse {
+                                            shard_id: req.shard_id,
+                                            index_name: req.name,
+                                            dimensions: req.dimensions,
+                                            distance_metric: req.distance_metric.to_lowercase(),
+                                        })
+                                        .into_response(),
+                                    ),
+                                    Err(e) => Ok(warp::reply::with_status(
+                                        warp::reply::json(&ErrorResponse {
+                                            error: e.to_string(),
+                                        }),
+                                        warp::http::StatusCode::BAD_REQUEST,
+                                    )
+                                    .into_response()),
+                                },
+                                Err(e) => Ok(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse { error: e }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                )
+                                .into_response()),
+                            }
+                        } else {
+                            Ok::<_, warp::Rejection>(
+                                warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse {
+                                        error: "Shard manager not configured".into(),
+                                    }),
+                                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                )
+                                .into_response(),
+                            )
+                        }
+                    }
+                })
+                .boxed();
+
+            let manager_for_add = shard_manager.clone();
+            let add_vector = warp::path(api_path.clone())
+                .and(warp::path("vectors"))
+                .and(warp::post())
+                .and(json_body::<AddVectorRequest>())
+                .and_then(move |req: AddVectorRequest| {
+                    let manager_opt = manager_for_add.clone();
+                    async move {
+                        if let Some(manager) = manager_opt {
+                            let vector = create_vector(req.vector);
+                            match manager.add_vector(req.shard_id, vector, req.metadata).await {
+                                Ok(id) => Ok::<_, warp::Rejection>(
+                                    warp::reply::json(&AddVectorResponse { vector_id: id })
+                                        .into_response(),
+                                ),
+                                Err(e) => Ok(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse {
+                                        error: e.to_string(),
+                                    }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                )
+                                .into_response()),
+                            }
+                        } else {
+                            Ok::<_, warp::Rejection>(
+                                warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse {
+                                        error: "Shard manager not configured".into(),
+                                    }),
+                                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                )
+                                .into_response(),
+                            )
+                        }
+                    }
+                })
+                .boxed();
+
+            let manager_for_search = shard_manager.clone();
+            let search_vectors = warp::path(api_path.clone())
+                .and(warp::path("search"))
+                .and(warp::post())
+                .and(json_body::<SearchVectorsRequest>())
+                .and_then(move |req: SearchVectorsRequest| {
+                    let manager_opt = manager_for_search.clone();
+                    async move {
+                        if let Some(manager) = manager_opt {
+                            if req.limit == 0 {
+                                return Ok::<_, warp::Rejection>(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse { error: "limit must be greater than zero".into() }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                ).into_response());
+                            }
+                            let query = create_vector(req.query_vector);
+                            if let Ok(index) = manager.get_vector_index(req.shard_id).await {
+                                let stats = index.stats().await;
+                                if query.dimensions != stats.dimensions {
+                                    return Ok::<_, warp::Rejection>(warp::reply::with_status(
+                                        warp::reply::json(&ErrorResponse {
+                                            error: format!(
+                                                "Query vector dimensions mismatch: expected {}, got {}",
+                                                stats.dimensions, query.dimensions
+                                            ),
+                                        }),
+                                        warp::http::StatusCode::BAD_REQUEST,
+                                    ).into_response());
+                                }
+                            } else {
+                                return Ok::<_, warp::Rejection>(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse { error: "Vector index not found".into() }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                ).into_response());
+                            }
+                            match manager.search_vectors(req.shard_id, &query, req.limit).await {
+                                Ok(results) => {
+                                    let results = convert_search_results(results);
+                                    Ok::<_, warp::Rejection>(warp::reply::json(&SearchVectorsResponse { results }).into_response())
+                                }
+                                Err(e) => Ok(warp::reply::with_status(
+                                    warp::reply::json(&ErrorResponse { error: e.to_string() }),
+                                    warp::http::StatusCode::BAD_REQUEST,
+                                ).into_response()),
+                            }
+                        } else {
+                            Ok::<_, warp::Rejection>(warp::reply::with_status(
+                                warp::reply::json(&ErrorResponse { error: "Shard manager not configured".into() }),
+                                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            ).into_response())
+                        }
+                    }
+                })
+                .boxed();
+
+            version_route
+                .or(stats_route)
+                .or(create_shard)
+                .or(create_index)
+                .or(add_vector)
+                .or(search_vectors)
+                .unify()
+                .boxed()
         } else {
             warp::path(api_path)
                 .map(|| {
