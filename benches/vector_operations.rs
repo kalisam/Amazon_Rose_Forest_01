@@ -45,6 +45,33 @@ fn bench_vector_operations(c: &mut Criterion) {
         group.finish();
     }
 
+    // Benchmark SIMD-enabled operations
+    {
+        let mut group = c.benchmark_group("vector_simd_operations");
+        let simd_dims = vec![8, 32, 128];
+        for &dim in &simd_dims {
+            let v1 = Vector::random(dim);
+            let v2 = Vector::random(dim);
+
+            group.bench_with_input(BenchmarkId::new("dot_simd", dim), &dim, |b, _| {
+                b.iter(|| black_box(&v1).dot(black_box(&v2)))
+            });
+
+            group.bench_with_input(BenchmarkId::new("euclidean_simd", dim), &dim, |b, _| {
+                b.iter(|| black_box(&v1).euclidean_distance(black_box(&v2)))
+            });
+
+            group.bench_with_input(BenchmarkId::new("manhattan_simd", dim), &dim, |b, _| {
+                b.iter(|| black_box(&v1).manhattan_distance(black_box(&v2)))
+            });
+
+            group.bench_with_input(BenchmarkId::new("hamming_simd", dim), &dim, |b, _| {
+                b.iter(|| black_box(&v1).hamming_distance(black_box(&v2)))
+            });
+        }
+        group.finish();
+    }
+
     // Benchmark batch operations
     {
         let mut group = c.benchmark_group("batch_operations");
