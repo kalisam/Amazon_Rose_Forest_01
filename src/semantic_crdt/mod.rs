@@ -3,7 +3,8 @@
 use std::collections::{HashMap, HashSet};
 use petgraph::graph::DiGraph;
 use serde::{Serialize, Deserialize};
-
+use hdk::prelude::{create_entry, ExternResult, LinkTag, hdk_entry, hdk_extern, WasmError};
+use hdk::map_extern;
 /// Semantic ontology graph with CRDT properties
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OntologyGraph {
