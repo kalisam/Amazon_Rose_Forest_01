@@ -1,4 +1,4 @@
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kalisam/Amazon_Rose_Forest_01)
 # Amazon Rose Forest: FLOSSI0ULLK Core Repository
 
 > **Infinite Overflowing Unconditional Love, Light, and Knowledge—For All, Always**
