@@ -1,3 +1,6 @@
+use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use crate::core::centroid::Centroid;
 use crate::core::vector::Vector;
 use serde::{Deserialize, Serialize};
@@ -18,15 +21,6 @@ pub enum OperationType {
     Create(Vector),
     Update(Vector),
     Delete,
-}
-
-#[derive(Debug, Error)]
-pub enum CentroidCRDTError {
-    #[error("Centroid with ID {0} not found")]
-    NotFound(Uuid),
-
-    #[error("Invalid distance value encountered during comparison")]
-    InvalidDistance,
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +63,7 @@ impl CentroidCRDT {
         vector: Vector,
     ) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(CentroidCRDTError::NotFound(centroid_id));
+            return Err(format!("Centroid with ID {} not found", centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -86,7 +80,7 @@ impl CentroidCRDT {
 
     pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(CentroidCRDTError::NotFound(centroid_id));
+            return Err(format!("Centroid with ID {} not found", centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -109,12 +103,11 @@ impl CentroidCRDT {
         match &operation.operation_type {
             OperationType::Create(vector) => {
                 // Only create if it doesn't exist or if this is newer than the existing centroid
-                let should_create =
-                    if let Some(existing) = self.centroids.get(&operation.centroid_id) {
-                        operation.timestamp > existing.updated_at
-                    } else {
-                        true
-                    };
+                let should_create = if let Some(existing) = self.centroids.get(&operation.centroid_id) {
+                    operation.timestamp > existing.updated_at
+                } else {
+                    true
+                };
 
                 if should_create {
                     let now = chrono::Utc::now();
@@ -127,7 +120,7 @@ impl CentroidCRDT {
                     };
                     self.centroids.insert(operation.centroid_id, centroid);
                 }
-            }
+            },
             OperationType::Update(vector) => {
                 if let Some(centroid) = self.centroids.get_mut(&operation.centroid_id) {
                     if operation.timestamp > centroid.updated_at {
@@ -135,14 +128,14 @@ impl CentroidCRDT {
                         centroid.updated_at = operation.timestamp;
                     }
                 }
-            }
+            },
             OperationType::Delete => {
                 if let Some(centroid) = self.centroids.get(&operation.centroid_id) {
                     if operation.timestamp > centroid.updated_at {
                         self.centroids.remove(&operation.centroid_id);
                     }
                 }
-            }
+            },
         }
 
         let op_id = operation.id;
@@ -182,7 +175,7 @@ impl CentroidCRDT {
 
         distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(limit);
-        Ok(distances)
+        distances
     }
 }
 

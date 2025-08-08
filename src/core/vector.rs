@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
+use wide::f32x4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
@@ -8,6 +9,7 @@ pub struct Vector {
 }
 
 impl Vector {
+    const SIMD_WIDTH: usize = 4;
     pub fn new(values: Vec<f32>) -> Self {
         let dimensions = values.len();
         Self { dimensions, values }
@@ -50,7 +52,11 @@ impl Vector {
             "Vectors must have the same dimensions"
         );
 
-        self.dot_scalar(other)
+        if self.dimensions % Self::SIMD_WIDTH == 0 {
+            self.dot_simd(other)
+        } else {
+            self.dot_scalar(other)
+        }
     }
 
     fn dot_scalar(&self, other: &Vector) -> f32 {
@@ -59,6 +65,26 @@ impl Vector {
             .zip(other.values.iter())
             .map(|(a, b)| a * b)
             .sum()
+    }
+
+    fn dot_simd(&self, other: &Vector) -> f32 {
+        let mut sum = f32x4::splat(0.0);
+        for i in (0..self.dimensions).step_by(Self::SIMD_WIDTH) {
+            let a = f32x4::new([
+                self.values[i],
+                self.values[i + 1],
+                self.values[i + 2],
+                self.values[i + 3],
+            ]);
+            let b = f32x4::new([
+                other.values[i],
+                other.values[i + 1],
+                other.values[i + 2],
+                other.values[i + 3],
+            ]);
+            sum = sum + a * b;
+        }
+        sum.reduce_add()
     }
 
     pub fn magnitude(&self) -> f32 {
@@ -95,7 +121,11 @@ impl Vector {
             "Vectors must have the same dimensions"
         );
 
-        self.euclidean_distance_scalar(other)
+        if self.dimensions % Self::SIMD_WIDTH == 0 {
+            self.euclidean_distance_simd(other)
+        } else {
+            self.euclidean_distance_scalar(other)
+        }
     }
 
     fn euclidean_distance_scalar(&self, other: &Vector) -> f32 {
@@ -109,17 +139,83 @@ impl Vector {
         sum_squared_diff.sqrt()
     }
 
+    fn euclidean_distance_simd(&self, other: &Vector) -> f32 {
+        let mut sum = f32x4::splat(0.0);
+        for i in (0..self.dimensions).step_by(Self::SIMD_WIDTH) {
+            let a = f32x4::new([
+                self.values[i],
+                self.values[i + 1],
+                self.values[i + 2],
+                self.values[i + 3],
+            ]);
+            let b = f32x4::new([
+                other.values[i],
+                other.values[i + 1],
+                other.values[i + 2],
+                other.values[i + 3],
+            ]);
+            let diff = a - b;
+            sum = sum + diff * diff;
+        }
+        sum.reduce_add().sqrt()
+    }
+
+    fn manhattan_distance_simd(&self, other: &Vector) -> f32 {
+        let mut sum = f32x4::splat(0.0);
+        for i in (0..self.dimensions).step_by(Self::SIMD_WIDTH) {
+            let a = f32x4::new([
+                self.values[i],
+                self.values[i + 1],
+                self.values[i + 2],
+                self.values[i + 3],
+            ]);
+            let b = f32x4::new([
+                other.values[i],
+                other.values[i + 1],
+                other.values[i + 2],
+                other.values[i + 3],
+            ]);
+            sum = sum + (a - b).abs();
+        }
+        sum.reduce_add()
+    }
+
+    fn hamming_distance_simd(&self, other: &Vector) -> usize {
+        let mut count = 0usize;
+        for i in (0..self.dimensions).step_by(Self::SIMD_WIDTH) {
+            let a = f32x4::new([
+                self.values[i],
+                self.values[i + 1],
+                self.values[i + 2],
+                self.values[i + 3],
+            ]);
+            let b = f32x4::new([
+                other.values[i],
+                other.values[i + 1],
+                other.values[i + 2],
+                other.values[i + 3],
+            ]);
+            let mask = (a - b).abs().cmp_gt(f32x4::splat(f32::EPSILON));
+            count += mask.move_mask().count_ones() as usize;
+        }
+        count
+    }
+
     pub fn manhattan_distance(&self, other: &Vector) -> f32 {
         assert_eq!(
             self.dimensions, other.dimensions,
             "Vectors must have the same dimensions"
         );
 
-        self.values
-            .iter()
-            .zip(other.values.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum()
+        if self.dimensions % Self::SIMD_WIDTH == 0 {
+            self.manhattan_distance_simd(other)
+        } else {
+            self.values
+                .iter()
+                .zip(other.values.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum()
+        }
     }
 
     pub fn hamming_distance(&self, other: &Vector) -> usize {
@@ -128,11 +224,15 @@ impl Vector {
             "Vectors must have the same dimensions"
         );
 
-        self.values
-            .iter()
-            .zip(other.values.iter())
-            .filter(|(&a, &b)| (a - b).abs() > f32::EPSILON)
-            .count()
+        if self.dimensions % Self::SIMD_WIDTH == 0 {
+            self.hamming_distance_simd(other)
+        } else {
+            self.values
+                .iter()
+                .zip(other.values.iter())
+                .filter(|(&a, &b)| (a - b).abs() > f32::EPSILON)
+                .count()
+        }
     }
 
     pub fn batch_process<F>(&self, others: &[Vector], f: F) -> Vec<f32>
