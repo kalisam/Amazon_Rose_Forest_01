@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
-use wide::f32x4;
+use wide::{f32x4, CmpGt};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
@@ -31,7 +31,7 @@ impl Vector {
 
     pub fn random(dimensions: usize) -> Self {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let values = (0..dimensions).map(|_| rng.gen::<f32>()).collect();
         Self { dimensions, values }
     }
@@ -39,7 +39,7 @@ impl Vector {
     pub fn random_normal(dimensions: usize, mean: f32, std_dev: f32) -> Self {
         use rand_distr::{Distribution, Normal};
         let normal = Normal::new(mean as f64, std_dev as f64).unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let values = (0..dimensions)
             .map(|_| normal.sample(&mut rng) as f32)
             .collect();

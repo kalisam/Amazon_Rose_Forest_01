@@ -248,7 +248,7 @@ impl Server {
                 .map(move || {
                     let mut sys = System::new();
                     let pid = get_current_pid().unwrap();
-                    sys.refresh_process(pid);
+                    sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]),true);
                     let mem_mb = sys.process(pid).map(|p| p.memory() / 1024).unwrap_or(0);
                     let uptime_seconds = if let Some(start) = *stats_start_time.read().unwrap() {
                         start.elapsed().as_secs()

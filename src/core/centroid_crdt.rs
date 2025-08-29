@@ -3,10 +3,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::core::centroid::Centroid;
 use crate::core::vector::Vector;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use thiserror::Error;
-use uuid::Uuid;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CentroidOperation {
@@ -15,6 +13,18 @@ pub struct CentroidOperation {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub operation_type: OperationType,
 }
+
+
+#[derive(Debug, Error)]
+pub enum CentroidCRDTError {
+    #[error("Centroid with ID {0} not found")]
+    NotFound(Uuid),
+
+    #[error("Invalid distance value encountered during comparison")]
+    InvalidDistance,
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationType {
@@ -63,7 +73,7 @@ impl CentroidCRDT {
         vector: Vector,
     ) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(format!("Centroid with ID {} not found", centroid_id));
+            return Err(CentroidCRDTError::NotFound(centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -80,7 +90,7 @@ impl CentroidCRDT {
 
     pub fn delete_centroid(&mut self, centroid_id: Uuid) -> Result<(), CentroidCRDTError> {
         if !self.centroids.contains_key(&centroid_id) {
-            return Err(format!("Centroid with ID {} not found", centroid_id));
+            return Err(CentroidCRDTError::NotFound(centroid_id));
         }
 
         let operation = CentroidOperation {
@@ -175,7 +185,7 @@ impl CentroidCRDT {
 
         distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(limit);
-        distances
+        Ok(distances)
     }
 }
 

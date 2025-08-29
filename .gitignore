@@ -7,3 +7,7 @@ Cargo.lock
 /.vs
 .git-credentials
 .gitconfig
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

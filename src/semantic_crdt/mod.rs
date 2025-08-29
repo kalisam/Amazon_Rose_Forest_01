@@ -3,8 +3,13 @@
 use std::collections::{HashMap, HashSet};
 use petgraph::graph::DiGraph;
 use serde::{Serialize, Deserialize};
-use hdk::prelude::{create_entry, ExternResult, LinkTag, hdk_entry, hdk_extern, WasmError};
+use HDI::prelude::*;
+use hdk::link::create_link;
 use hdk::map_extern;
+use hdk::prelude::{create_entry, ExternResult, LinkTag, hdk_extern, WasmError};
+
+
+
 /// Semantic ontology graph with CRDT properties
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OntologyGraph {
@@ -244,7 +249,7 @@ pub fn semantic_merge(a: OntologyGraph, b: OntologyGraph) -> OntologyGraph {
 }
 
 /// Entry definition for ontology graph
-#[hdk_entry(id = "ontology_graph")]
+#[app_entry(id = "ontology_graph")]
 #[derive(Clone)]
 pub struct OntologyGraphEntry {
     pub graph_id: String,
@@ -259,7 +264,7 @@ pub struct OntologyGraphEntry {
 #[hdk_extern]
 pub fn create_ontology_graph(input: CreateOntologyInput) -> ExternResult<String> {
     let graph_id = uuid::Uuid::new_v4().to_string();
-    let now = crate::holochain::utils::sys_time()?;
+    let now = crate::utils::sys_time()?;
     
     let graph = OntologyGraph::new(input.similarity_threshold);
     
