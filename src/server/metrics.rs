@@ -9,6 +9,32 @@ pub static REGISTRY: Lazy<Registry> = Lazy::new(Registry::new);
 
 // Define metrics
 
+// HTTP server metrics
+pub static INCOMING_REQUESTS: Lazy<CounterVec> = Lazy::new(|| {
+    register_counter_vec!(
+        "incoming_requests_total",
+        "Number of incoming HTTP requests",
+        &["method", "path"],
+        REGISTRY.clone(),
+    )
+    .expect("Failed to create incoming requests counter")
+});
+
+pub static HTTP_REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        HistogramOpts::new(
+            "http_request_duration_seconds",
+            "Duration of HTTP requests in seconds",
+        )
+        .buckets(vec![
+            0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
+        ]),
+        &["method", "path", "status"],
+        REGISTRY.clone(),
+    )
+    .expect("Failed to create HTTP request duration histogram")
+});
+
 // Vector operations
 pub static VECTOR_OPS_COUNTER: Lazy<CounterVec> = Lazy::new(|| {
     register_counter_vec!(
